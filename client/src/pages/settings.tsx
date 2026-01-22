@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Eye, EyeOff, Save, Globe, Key, ShieldAlert } from "lucide-react";
+import { Eye, EyeOff, Save, Globe, Key, ShieldAlert, Clock } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -37,6 +37,43 @@ export default function Settings() {
         </div>
 
         <div className="grid gap-6">
+          {/* Scheduling Configuration */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" />
+                <CardTitle>Automation Schedule</CardTitle>
+              </div>
+              <CardDescription>
+                Control when and how often the pipeline runs.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Frequency</Label>
+                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="hourly">Hourly (Testing)</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Run Time</Label>
+                  <Input type="time" defaultValue="09:00" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Timezone</Label>
+                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <option value="pst">Pacific Time (PST/PDT)</option>
+                    <option value="est">Eastern Time (EST/EDT)</option>
+                    <option value="utc">UTC</option>
+                  </select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* RSS Configuration */}
           <Card>
             <CardHeader>

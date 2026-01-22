@@ -107,7 +107,7 @@ export default function Settings() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>Google News RSS Feed URLs (Priority Order)</Label>
+                  <Label>RSS Feed URLs</Label>
                   <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs" onClick={addRssUrl}>
                     <Plus className="h-3 w-3" /> Add Source
                   </Button>
@@ -176,15 +176,7 @@ export default function Settings() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Provider</Label>
-                      <select 
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        onChange={(e) => setShowKeys(prev => ({ ...prev, provider: e.target.value }))}
-                      >
-                        <option value="openai">OpenAI</option>
-                        <option value="novita">Novita AI</option>
-                        <option value="anthropic">Anthropic</option>
-                        <option value="custom">Custom / Local (Ollama)</option>
-                      </select>
+                      <Input placeholder="Custom Provider Name (e.g. OpenAI, Novita, Ollama)" defaultValue="OpenAI" />
                     </div>
                     <div className="space-y-2">
                       <Label>Model Name</Label>

@@ -5,12 +5,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { Eye, EyeOff, Save, Globe, Key, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Settings() {
-  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+  const [showKeys, setShowKeys] = useState<Record<string, any>>({});
   const { toast } = useToast();
 
   const toggleShowKey = (key: string) => {

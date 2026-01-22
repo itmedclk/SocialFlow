@@ -153,31 +153,31 @@ export default function Settings() {
 
               <Separator />
 
-              {/* Google Sheets Integration */}
+              {/* Data Storage Configuration */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <Label className="text-base">Google Workspace Integration</Label>
-                  <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200">Required for Audit</Badge>
+                  <Label className="text-base">Data Storage & Audit</Label>
+                  <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-700 border-slate-200">Local System</Badge>
                 </div>
                 
                 <div className="grid gap-4 p-4 border rounded-lg bg-muted/10">
                   <div className="space-y-2">
-                    <Label>Google Sheet ID</Label>
-                    <div className="flex gap-2">
-                      <Input placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE..." className="font-mono text-xs" />
-                      <Button variant="outline" onClick={() => toast({ title: "Checking Sheet Access", description: "Successfully connected to 'Audit Log 2026'" })}>
-                        Test
-                      </Button>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">The ID found in your spreadsheet URL.</p>
+                    <Label>Storage Method</Label>
+                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <option value="local">Local App Storage (JSON Logs)</option>
+                      <option value="db" disabled>PostgreSQL Database (Coming Soon)</option>
+                    </select>
+                    <p className="text-[10px] text-muted-foreground">
+                      Post history and failures will be saved to <code>/logs/posts.json</code> in the application folder.
+                    </p>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label>Service Account Credentials (JSON)</Label>
-                    <textarea 
-                      className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      placeholder='{ "type": "service_account", "project_id": "..." }'
-                    />
+                  <div className="flex items-center justify-between border p-3 rounded-md bg-background">
+                     <div className="space-y-0.5">
+                       <Label className="text-sm">Retention Policy</Label>
+                       <p className="text-[10px] text-muted-foreground">Auto-delete logs older than 30 days</p>
+                     </div>
+                     <Switch defaultChecked />
                   </div>
                 </div>
               </div>

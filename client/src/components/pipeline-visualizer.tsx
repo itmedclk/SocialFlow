@@ -21,7 +21,7 @@ const INITIAL_STEPS: StepProps[] = [
   { label: "Dedupe Filter", status: "pending", description: "Check History", index: 2 },
   { label: "AI Generation", status: "pending", description: "Caption & Tags", index: 3 },
   { label: "Safety Check", status: "pending", description: "Claims & Len", index: 4 },
-  { label: "Docs Audit", status: "pending", description: "Create Record", index: 5 },
+  { label: "App Log", status: "pending", description: "Save JSON", index: 5 },
   { label: "Image Search", status: "pending", description: "Source API", index: 6 },
   { label: "Postly Sched", status: "pending", description: "11:00 PST", index: 7 },
 ];

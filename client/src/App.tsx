@@ -8,6 +8,7 @@ import Dashboard from "@/pages/dashboard";
 import Settings from "@/pages/settings";
 import Pipeline from "@/pages/pipeline";
 import Review from "@/pages/review";
+import AuditLog from "@/pages/audit-log";
 
 function Router() {
   return (
@@ -15,7 +16,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/pipeline" component={Pipeline} />
       <Route path="/review" component={Review} />
-      <Route path="/logs" component={Pipeline} /> {/* Reusing pipeline view for logs for now */}
+      <Route path="/logs" component={AuditLog} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>

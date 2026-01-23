@@ -106,11 +106,7 @@ function buildSystemPrompt(campaign: Campaign,
 Keep the tone professional yet approachable. Include relevant hashtags. 
 The post should be compelling and encourage engagement.`;
 
-  // const customPrompt = campaign.aiPrompt?.trim();
-  const basePrompt = 
-    overridePrompt?.trim() ||
-    campaign.aiPrompt?.trim() ||
-    DEFAULT_PROMPT;
+  const customPrompt = overridePrompt?.trim() || campaign.aiPrompt?.trim();
 
   let prompt = customPrompt || defaultPrompt;
 

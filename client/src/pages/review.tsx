@@ -17,7 +17,8 @@ import {
   Image as ImageIcon,
   MessageSquare,
   Save,
-  Wand2
+  Wand2,
+  Search
 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +38,13 @@ export default function Review() {
   );
 
   const activeCampaign = MOCK_CAMPAIGNS.find(c => c.id === selectedCampaign) || MOCK_CAMPAIGNS[0];
+
+  const handleFetchNew = () => {
+    toast({
+      title: "Fetching New Content",
+      description: `Searching RSS feeds for ${activeCampaign.name} and generating new draft...`,
+    });
+  };
 
   const handleRegenerate = () => {
     toast({
@@ -78,6 +86,10 @@ export default function Review() {
                </Select>
              </div>
           <div className="flex gap-2">
+            <Button variant="secondary" className="gap-2" onClick={handleFetchNew}>
+              <Search className="h-4 w-4" />
+              Find New Article
+            </Button>
             <Button variant="outline" className="gap-2 text-destructive hover:text-destructive">
               <X className="h-4 w-4" />
               Reject Draft

@@ -212,11 +212,69 @@ export default function Review() {
     }
   };
 
-  const handleRegenerate = () => {
-    toast({
-      title: "AI Generation Not Yet Implemented",
-      description: "AI caption generation will be available in Phase 2.",
-    });
+  const [generating, setGenerating] = useState(false);
+
+  const handleRegenerate = async () => {
+    if (!currentPost) return;
+    
+    setGenerating(true);
+    try {
+      const response = await fetch(`/api/posts/${currentPost.id}/generate`, {
+        method: 'POST'
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to generate content');
+      }
+      
+      toast({
+        title: "Content Generated",
+        description: "AI has generated a new caption for this post.",
+      });
+      
+      if (result.post) {
+        setCaption(result.post.generatedCaption || "");
+      }
+      
+      await fetchPosts(activeCampaign?.id);
+    } catch (error) {
+      toast({
+        title: "Generation Failed",
+        description: error instanceof Error ? error.message : "Failed to generate content. Make sure AI_API_KEY is configured.",
+        variant: "destructive",
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!currentPost) return;
+    
+    try {
+      const response = await fetch(`/api/posts/${currentPost.id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Rejected by user' })
+      });
+      
+      if (!response.ok) throw new Error('Failed to reject');
+      
+      toast({
+        title: "Post Rejected",
+        description: "This post has been marked as rejected.",
+      });
+      
+      await fetchPosts(activeCampaign?.id);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to reject post",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -283,6 +341,16 @@ export default function Review() {
           </div>
           
           <div className="flex gap-2">
+            <Button 
+              variant="destructive" 
+              className="gap-2" 
+              onClick={handleReject}
+              disabled={!currentPost}
+              data-testid="button-reject"
+            >
+              <X className="h-4 w-4" />
+              Reject
+            </Button>
             <Button 
               variant="outline" 
               className="gap-2" 
@@ -394,10 +462,11 @@ export default function Review() {
                   variant="secondary" 
                   className="w-full gap-2 hover:bg-primary/10 hover:text-primary transition-colors" 
                   onClick={handleRegenerate}
+                  disabled={!currentPost || generating}
                   data-testid="button-regenerate"
                 >
-                  <RefreshCw className="h-4 w-4" />
-                  Regenerate Caption (Phase 2)
+                  <RefreshCw className={`h-4 w-4 ${generating ? 'animate-spin' : ''}`} />
+                  {generating ? 'Generating...' : 'Generate Caption with AI'}
                 </Button>
               </CardContent>
             </Card>

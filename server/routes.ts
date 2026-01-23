@@ -4,6 +4,8 @@ import { storage } from "./storage";
 import { insertCampaignSchema, insertPostSchema, insertLogSchema } from "@shared/schema";
 import { z } from "zod";
 import { processCampaignFeeds, processAllActiveCampaigns } from "./services/rss";
+import { processNewPost, publishPost, processDraftPosts } from "./services/pipeline";
+import { runNow } from "./services/scheduler";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -298,6 +300,181 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching all campaigns:", error);
       res.status(500).json({ error: "Failed to fetch campaigns" });
+    }
+  });
+
+  // ============================================
+  // Pipeline Routes (AI Generation & Publishing)
+  // ============================================
+
+  app.post("/api/campaigns/:id/process", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid campaign ID" });
+      }
+
+      const result = await processDraftPosts(id);
+      res.json({
+        ok: true,
+        message: `Processed ${result.processed} drafts: ${result.success} succeeded, ${result.failed} failed`,
+        ...result
+      });
+    } catch (error) {
+      console.error("Error processing drafts:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to process drafts" 
+      });
+    }
+  });
+
+  app.post("/api/posts/:id/generate", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid post ID" });
+      }
+
+      const post = await storage.getPost(id);
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      const campaign = await storage.getCampaign(post.campaignId);
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      await processNewPost(post, campaign);
+      const updatedPost = await storage.getPost(id);
+
+      res.json({
+        success: true,
+        message: "Content generated successfully",
+        post: updatedPost
+      });
+    } catch (error) {
+      console.error("Error generating content:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to generate content" 
+      });
+    }
+  });
+
+  app.post("/api/posts/:id/publish", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid post ID" });
+      }
+
+      const post = await storage.getPost(id);
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      const campaign = await storage.getCampaign(post.campaignId);
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      await publishPost(post, campaign);
+      const updatedPost = await storage.getPost(id);
+
+      res.json({
+        success: true,
+        message: "Post published successfully",
+        post: updatedPost
+      });
+    } catch (error) {
+      console.error("Error publishing post:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to publish post" 
+      });
+    }
+  });
+
+  app.post("/api/posts/:id/approve", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid post ID" });
+      }
+
+      const scheduledFor = req.body.scheduledFor ? new Date(req.body.scheduledFor) : null;
+
+      const post = await storage.updatePost(id, {
+        status: scheduledFor ? "scheduled" : "approved",
+        scheduledFor
+      });
+
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      await storage.createLog({
+        campaignId: post.campaignId,
+        postId: post.id,
+        level: "info",
+        message: scheduledFor 
+          ? `Post approved and scheduled for ${scheduledFor.toISOString()}`
+          : "Post approved",
+      });
+
+      res.json({ success: true, post });
+    } catch (error) {
+      console.error("Error approving post:", error);
+      res.status(500).json({ error: "Failed to approve post" });
+    }
+  });
+
+  app.post("/api/posts/:id/reject", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid post ID" });
+      }
+
+      const reason = req.body.reason || "Rejected by user";
+
+      const post = await storage.updatePost(id, {
+        status: "failed",
+        failureReason: reason
+      });
+
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      await storage.createLog({
+        campaignId: post.campaignId,
+        postId: post.id,
+        level: "info",
+        message: `Post rejected: ${reason}`,
+      });
+
+      res.json({ success: true, post });
+    } catch (error) {
+      console.error("Error rejecting post:", error);
+      res.status(500).json({ error: "Failed to reject post" });
+    }
+  });
+
+  app.post("/api/run", async (req, res) => {
+    try {
+      const { action, campaignId } = req.body;
+      
+      if (!action || !["fetch", "process", "publish"].includes(action)) {
+        return res.status(400).json({ error: "Invalid action. Must be: fetch, process, or publish" });
+      }
+
+      const result = await runNow(action, campaignId);
+      res.json({ success: true, result });
+    } catch (error) {
+      console.error("Error running action:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to run action" 
+      });
     }
   });
 

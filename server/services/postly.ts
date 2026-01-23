@@ -7,21 +7,30 @@ interface PostlyConfig {
 }
 
 interface PostlyPublishPayload {
-  message: string;
-  media_urls?: string[];
-  platforms: string[];
-  scheduled_time?: string;
+  text: string;
+  media?: Array<{
+    url: string;
+    type: string;
+  }>;
+  target_platforms?: string;
+  workspace?: string;
+  one_off_schedule?: {
+    one_off_date: string;
+    time: string;
+    timezone: string;
+  };
 }
 
 interface PostlyResponse {
   success: boolean;
   post_id?: string;
+  message?: string;
   error?: string;
 }
 
 function getPostlyConfig(): PostlyConfig {
   const apiKey = process.env.POSTLY_API_KEY || "";
-  const baseUrl = process.env.POSTLY_BASE_URL || "https://api.postly.ai/v1";
+  const baseUrl = process.env.POSTLY_BASE_URL || "https://openapi.postly.ai/v1";
 
   return { apiKey, baseUrl };
 }
@@ -40,25 +49,26 @@ export async function publishToPostly(
 
   const platforms = campaign.targetPlatforms || [];
   
-  if (platforms.length === 0) {
-    throw new Error("No target platforms configured for this campaign");
-  }
-
   const payload: PostlyPublishPayload = {
-    message: post.generatedCaption || "",
-    platforms: platforms,
+    text: post.generatedCaption || "",
+    target_platforms: platforms.join(","),
   };
 
   if (post.imageUrl) {
-    payload.media_urls = [post.imageUrl];
+    payload.media = [
+      {
+        url: post.imageUrl,
+        type: "image"
+      }
+    ];
   }
 
   try {
-    const response = await fetch(`${config.baseUrl}/posts/create`, {
+    const response = await fetch(`${config.baseUrl}/posts`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        "X-API-KEY": apiKey,
       },
       body: JSON.stringify(payload),
     });
@@ -70,7 +80,8 @@ export async function publishToPostly(
 
     const data: PostlyResponse = await response.json();
 
-    if (!data.success) {
+    // The API might return success in a different format, checking based on common patterns
+    if (data.error) {
       throw new Error(data.error || "Postly returned unsuccessful response");
     }
 

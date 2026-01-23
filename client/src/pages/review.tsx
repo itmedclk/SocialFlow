@@ -261,7 +261,11 @@ export default function Review() {
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to schedule");
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Schedule error details:", errorData);
+        throw new Error(errorData.error || "Failed to schedule");
+      }
 
       toast({
         title: "Scheduled",

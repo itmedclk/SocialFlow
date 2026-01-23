@@ -207,7 +207,17 @@ export async function registerRoutes(
       }
       
       const partialSchema = insertPostSchema.partial();
-      const validatedData = partialSchema.parse(req.body);
+      const rawData = req.body;
+      
+      // Convert ISO string to Date object for Zod if present
+      if (rawData.scheduledFor && typeof rawData.scheduledFor === 'string') {
+        rawData.scheduledFor = new Date(rawData.scheduledFor);
+      }
+      if (rawData.pubDate && typeof rawData.pubDate === 'string') {
+        rawData.pubDate = new Date(rawData.pubDate);
+      }
+      
+      const validatedData = partialSchema.parse(rawData);
       
       const post = await storage.updatePost(id, validatedData);
       if (!post) {

@@ -112,34 +112,13 @@ export async function processCampaignFeeds(campaignId: number): Promise<{
 
           await storage.createPost(postData);
           result.new++;
-
-          await storage.createLog({
-            campaignId,
-            level: "info",
-            message: `New article found: "${article.title}"`,
-            metadata: { url: article.link, guid: article.guid },
-          });
         }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       result.errors.push(`Feed ${url}: ${errorMessage}`);
-      
-      await storage.createLog({
-        campaignId,
-        level: "error",
-        message: `Failed to fetch RSS feed`,
-        metadata: { url, error: errorMessage },
-      });
     }
   }
-
-  await storage.createLog({
-    campaignId,
-    level: "info",
-    message: `RSS fetch completed: ${result.new} new articles from ${result.fetched} total`,
-    metadata: result,
-  });
 
   return result;
 }

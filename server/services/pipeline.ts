@@ -7,13 +7,6 @@ import type { Post, Campaign } from "@shared/schema";
 const MAX_RETRIES = 3;
 
 export async function processNewPost(post: Post, campaign: Campaign): Promise<void> {
-  await storage.createLog({
-    campaignId: campaign.id,
-    postId: post.id,
-    level: "info",
-    message: `Starting content generation for: "${post.sourceTitle}"`,
-  });
-
   try {
     const safetyConfig = getSafetyConfigFromCampaign(campaign);
     let caption: string | null = null;
@@ -80,18 +73,6 @@ export async function processNewPost(post: Post, campaign: Campaign): Promise<vo
       imageUrl: imageUrl || null,
       imageCredit: imageCredit || null,
       status: "draft",
-    });
-
-    await storage.createLog({
-      campaignId: campaign.id,
-      postId: post.id,
-      level: "info",
-      message: `Content generation completed successfully`,
-      metadata: { 
-        captionLength: caption.length, 
-        hasImage: !!imageUrl,
-        imageSource: imageCredit 
-      },
     });
 
   } catch (error) {

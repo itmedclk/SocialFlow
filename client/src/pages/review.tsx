@@ -18,7 +18,9 @@ import {
   MessageSquare,
   Save,
   Wand2,
-  Search
+  Search,
+  CalendarClock,
+  Send
 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -53,24 +55,42 @@ export default function Review() {
     });
   };
 
-  const handleApprove = () => {
+  const handleSaveDraft = () => {
     toast({
-      title: "Content Approved",
-      description: "Post scheduled and data saved to Google Sheet.",
+      title: "Draft Saved",
+      description: "Content saved to drafts for later review.",
+      variant: "default",
+    });
+  };
+
+  const handlePostNow = () => {
+    toast({
+      title: "Posting Now",
+      description: "Content is being published to configured platforms.",
+      variant: "default",
+    });
+  };
+
+  const handleSchedule = () => {
+    toast({
+      title: "Scheduled",
+      description: "Post queued for the next available slot.",
       variant: "default",
     });
   };
 
   return (
     <Layout>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="space-y-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Content Review</h1>
           <p className="text-muted-foreground mt-1">
             Review and refine AI-generated drafts before scheduling.
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 items-end sm:items-center">
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 border rounded-lg bg-card shadow-sm">
+          <div className="flex flex-col sm:flex-row gap-3 items-end sm:items-center flex-1">
              <div className="w-[250px]">
                <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
                  <SelectTrigger>
@@ -85,24 +105,30 @@ export default function Review() {
                  </SelectContent>
                </Select>
              </div>
+             <Button variant="secondary" className="gap-2" onClick={handleFetchNew}>
+                <Search className="h-4 w-4" />
+                Find New Article
+             </Button>
+          </div>
+          
           <div className="flex gap-2">
-            <Button variant="secondary" className="gap-2" onClick={handleFetchNew}>
-              <Search className="h-4 w-4" />
-              Find New Article
+            <Button variant="outline" className="gap-2" onClick={handleSaveDraft}>
+              <Save className="h-4 w-4" />
+              Save Draft
             </Button>
-            <Button variant="outline" className="gap-2 text-destructive hover:text-destructive">
-              <X className="h-4 w-4" />
-              Reject Draft
+            <Button variant="outline" className="gap-2" onClick={handleSchedule}>
+              <CalendarClock className="h-4 w-4" />
+              Schedule
             </Button>
-            <Button className="gap-2 shadow-lg shadow-primary/25" onClick={handleApprove}>
-              <Check className="h-4 w-4" />
-              Approve & Schedule
+            <Button className="gap-2 shadow-lg shadow-primary/25" onClick={handlePostNow}>
+              <Send className="h-4 w-4" />
+              Post Now
             </Button>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-12rem)]">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-14rem)]">
         
         {/* Left Column: Source & Controls */}
         <div className="space-y-6 flex flex-col h-full overflow-y-auto pr-2 pb-4">

@@ -3,6 +3,8 @@ import { pgTable, text, varchar, serial, boolean, timestamp, integer, jsonb } fr
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export * from "./models/auth";
+
 // ============================================
 // Campaigns Table
 // ============================================
@@ -85,18 +87,24 @@ export type InsertLog = z.infer<typeof insertLogSchema>;
 export type Log = typeof logs.$inferSelect;
 
 // ============================================
-// Users Table (for future authentication)
+// User Settings Table (per-user API keys)
 // ============================================
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+export const userSettings = pgTable("user_settings", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().unique(),
+  aiApiKey: text("ai_api_key"),
+  aiBaseUrl: text("ai_base_url"),
+  aiModel: text("ai_model"),
+  postlyApiKey: text("postly_api_key"),
+  unsplashAccessKey: text("unsplash_access_key"),
+  pexelsApiKey: text("pexels_api_key"),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const insertUserSettingsSchema = createInsertSchema(userSettings).omit({
+  id: true,
+  updatedAt: true,
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type InsertUserSettings = z.infer<typeof insertUserSettingsSchema>;
+export type UserSettings = typeof userSettings.$inferSelect;

@@ -1,11 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCampaignSchema, insertPostSchema, insertLogSchema } from "@shared/schema";
+import { insertCampaignSchema, insertPostSchema, insertLogSchema, insertUserSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { processCampaignFeeds, processAllActiveCampaigns } from "./services/rss";
 import { processNewPost, publishPost, processDraftPosts } from "./services/pipeline";
 import { runNow } from "./services/scheduler";
+import { isAuthenticated } from "./replit_integrations/auth";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -514,6 +515,98 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching stats:", error);
       res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
+  // ============================================
+  // User Settings Routes (requires authentication)
+  // ============================================
+
+  app.get("/api/settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const settings = await storage.getUserSettings(userId);
+      
+      if (!settings) {
+        return res.json({
+          userId,
+          aiApiKey: null,
+          aiBaseUrl: null,
+          aiModel: null,
+          postlyApiKey: null,
+          unsplashAccessKey: null,
+          pexelsApiKey: null,
+        });
+      }
+      
+      res.json({
+        ...settings,
+        aiApiKey: settings.aiApiKey ? "••••••••" : null,
+        postlyApiKey: settings.postlyApiKey ? "••••••••" : null,
+        unsplashAccessKey: settings.unsplashAccessKey ? "••••••••" : null,
+        pexelsApiKey: settings.pexelsApiKey ? "••••••••" : null,
+      });
+    } catch (error) {
+      console.error("Error fetching settings:", error);
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  app.put("/api/settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const existingSettings = await storage.getUserSettings(userId);
+      
+      const updateData: any = { userId };
+      
+      if (req.body.aiApiKey !== undefined && req.body.aiApiKey !== "••••••••") {
+        updateData.aiApiKey = req.body.aiApiKey || null;
+      } else if (existingSettings) {
+        updateData.aiApiKey = existingSettings.aiApiKey;
+      }
+      
+      if (req.body.aiBaseUrl !== undefined) {
+        updateData.aiBaseUrl = req.body.aiBaseUrl || null;
+      } else if (existingSettings) {
+        updateData.aiBaseUrl = existingSettings.aiBaseUrl;
+      }
+      
+      if (req.body.aiModel !== undefined) {
+        updateData.aiModel = req.body.aiModel || null;
+      } else if (existingSettings) {
+        updateData.aiModel = existingSettings.aiModel;
+      }
+      
+      if (req.body.postlyApiKey !== undefined && req.body.postlyApiKey !== "••••••••") {
+        updateData.postlyApiKey = req.body.postlyApiKey || null;
+      } else if (existingSettings) {
+        updateData.postlyApiKey = existingSettings.postlyApiKey;
+      }
+      
+      if (req.body.unsplashAccessKey !== undefined && req.body.unsplashAccessKey !== "••••••••") {
+        updateData.unsplashAccessKey = req.body.unsplashAccessKey || null;
+      } else if (existingSettings) {
+        updateData.unsplashAccessKey = existingSettings.unsplashAccessKey;
+      }
+      
+      if (req.body.pexelsApiKey !== undefined && req.body.pexelsApiKey !== "••••••••") {
+        updateData.pexelsApiKey = req.body.pexelsApiKey || null;
+      } else if (existingSettings) {
+        updateData.pexelsApiKey = existingSettings.pexelsApiKey;
+      }
+      
+      const settings = await storage.upsertUserSettings(updateData);
+      
+      res.json({
+        ...settings,
+        aiApiKey: settings.aiApiKey ? "••••••••" : null,
+        postlyApiKey: settings.postlyApiKey ? "••••••••" : null,
+        unsplashAccessKey: settings.unsplashAccessKey ? "••••••••" : null,
+        pexelsApiKey: settings.pexelsApiKey ? "••••••••" : null,
+      });
+    } catch (error) {
+      console.error("Error updating settings:", error);
+      res.status(500).json({ error: "Failed to update settings" });
     }
   });
 

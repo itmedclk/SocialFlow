@@ -34,7 +34,15 @@ Preferred communication style: Simple, everyday language.
 - **Campaigns**: Configuration for automation workflows (RSS URLs, AI prompts, scheduling, target platforms)
 - **Posts**: Content items with status tracking (draft → approved → scheduled → posted/failed)
 - **Logs**: Audit trail for all system events with severity levels
-- **Users**: Basic user management (prepared but not fully implemented)
+- **Users**: Replit Auth-based user accounts (id, email, name, profile image)
+- **UserSettings**: Per-user API key storage (AI, Postly, Unsplash, Pexels)
+- **Sessions**: PostgreSQL-backed session storage for authentication
+
+### Authentication & Multi-Tenancy
+- **Replit Auth**: OpenID Connect integration via `server/replit_integrations/auth/`
+- **Per-user API keys**: Each user provides their own API keys stored in `user_settings` table
+- **Protected routes**: Use `isAuthenticated` middleware for authenticated endpoints
+- **Session management**: PostgreSQL session store with 7-day TTL
 
 ### Background Processing
 - **RSS Service**: `server/services/rss.ts` handles feed fetching with rss-parser, deduplication via source GUID

@@ -4,427 +4,377 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Eye, EyeOff, Save, Globe, Key, ShieldAlert, Clock, Plus, Trash2, Check } from "lucide-react";
-import { useState } from "react";
+import { Eye, EyeOff, Save, Key, AlertCircle, LogIn, LogOut, User } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Checkbox } from "@/components/ui/checkbox";
+import { useAuth } from "@/hooks/use-auth";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { isUnauthorizedError } from "@/lib/auth-utils";
+
+interface UserSettings {
+  userId: string;
+  aiApiKey: string | null;
+  aiBaseUrl: string | null;
+  aiModel: string | null;
+  postlyApiKey: string | null;
+  unsplashAccessKey: string | null;
+  pexelsApiKey: string | null;
+}
 
 export default function Settings() {
-  const [showKeys, setShowKeys] = useState<Record<string, any>>({});
-  const [rssUrls, setRssUrls] = useState<string[]>([
-    "https://news.google.com/rss/search?q=alternative+health+OR+integrative+medicine&hl=en-US&gl=US&ceid=US:en"
-  ]);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["instagram"]);
+  const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+  const [formData, setFormData] = useState({
+    aiApiKey: "",
+    aiBaseUrl: "https://api.novita.ai/v3/openai",
+    aiModel: "deepseek/deepseek-v3-0324",
+    postlyApiKey: "",
+    unsplashAccessKey: "",
+    pexelsApiKey: "",
+  });
+
+  const { data: settings, isLoading: settingsLoading } = useQuery<UserSettings>({
+    queryKey: ["/api/settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings", { credentials: "include" });
+      if (!res.ok) {
+        if (res.status === 401) throw new Error("401: Unauthorized");
+        throw new Error("Failed to fetch settings");
+      }
+      return res.json();
+    },
+    enabled: isAuthenticated,
+  });
+
+  useEffect(() => {
+    if (settings) {
+      setFormData({
+        aiApiKey: settings.aiApiKey || "",
+        aiBaseUrl: settings.aiBaseUrl || "https://api.novita.ai/v3/openai",
+        aiModel: settings.aiModel || "deepseek/deepseek-v3-0324",
+        postlyApiKey: settings.postlyApiKey || "",
+        unsplashAccessKey: settings.unsplashAccessKey || "",
+        pexelsApiKey: settings.pexelsApiKey || "",
+      });
+    }
+  }, [settings]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        if (res.status === 401) throw new Error("401: Unauthorized");
+        throw new Error("Failed to save settings");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      toast({
+        title: "Settings Saved",
+        description: "Your API configurations have been securely stored.",
+      });
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Session Expired",
+          description: "Please log in again.",
+          variant: "destructive",
+        });
+        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const toggleShowKey = (key: string) => {
     setShowKeys(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const addRssUrl = () => {
-    setRssUrls([...rssUrls, ""]);
-  };
-
-  const removeRssUrl = (index: number) => {
-    const newUrls = [...rssUrls];
-    newUrls.splice(index, 1);
-    setRssUrls(newUrls);
-  };
-
-  const updateRssUrl = (index: number, value: string) => {
-    const newUrls = [...rssUrls];
-    newUrls[index] = value;
-    setRssUrls(newUrls);
-  };
-
-  const togglePlatform = (platform: string) => {
-    setSelectedPlatforms(prev => 
-      prev.includes(platform) 
-        ? prev.filter(p => p !== platform)
-        : [...prev, platform]
-    );
-  };
-
   const handleSave = () => {
-    toast({
-      title: "Settings Saved",
-      description: "Your API configurations have been securely stored.",
-      variant: "default",
-    });
+    saveMutation.mutate(formData);
   };
+
+  if (authLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center space-y-4">
+            <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Card className="max-w-md w-full">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <LogIn className="h-6 w-6 text-primary" />
+              </div>
+              <CardTitle>Sign In Required</CardTitle>
+              <CardDescription>
+                Please sign in to manage your API keys and settings. Your keys are securely stored and only accessible to you.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+              <Button asChild size="lg" className="gap-2">
+                <a href="/api/login" data-testid="button-login">
+                  <LogIn className="h-4 w-4" />
+                  Sign In with Replit
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Configuration</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your API connections and automation preferences.
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">API Settings</h1>
+            <p className="text-muted-foreground mt-1">
+              Manage your personal API keys for AI, publishing, and image services.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              {user?.profileImageUrl ? (
+                <img src={user.profileImageUrl} alt="" className="h-8 w-8 rounded-full" />
+              ) : (
+                <User className="h-5 w-5" />
+              )}
+              <span>{user?.firstName || user?.email || "User"}</span>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => logout()} data-testid="button-logout">
+              <LogOut className="h-4 w-4 mr-1" />
+              Sign Out
+            </Button>
+          </div>
         </div>
 
-        <div className="grid gap-6">
-          {/* Scheduling Configuration */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-primary" />
-                <CardTitle>Automation Schedule</CardTitle>
-              </div>
-              <CardDescription>
-                Control when and how often the pipeline runs.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Frequency</Label>
-                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="hourly">Hourly (Testing)</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Run Time</Label>
-                  <Input type="time" defaultValue="09:00" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Timezone</Label>
-                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    <option value="pst">Pacific Time (PST/PDT)</option>
-                    <option value="est">Eastern Time (EST/EDT)</option>
-                    <option value="utc">UTC</option>
-                  </select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* RSS Configuration */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Globe className="h-5 w-5 text-primary" />
-                <CardTitle>Content Source (RSS)</CardTitle>
-              </div>
-              <CardDescription>
-                Define where the application looks for new content.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>RSS Feed URLs</Label>
-                  <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs" onClick={addRssUrl}>
-                    <Plus className="h-3 w-3" /> Add Source
-                  </Button>
-                </div>
-                
-                <div className="space-y-2">
-                  {rssUrls.map((url, index) => (
-                    <div key={index} className="flex gap-2">
-                      <div className="relative flex-1">
-                        <span className="absolute left-3 top-2.5 text-xs font-mono text-muted-foreground">#{index + 1}</span>
-                        <Input 
-                          value={url}
-                          onChange={(e) => updateRssUrl(index, e.target.value)}
-                          className="font-mono text-xs pl-8"
-                          placeholder="https://news.google.com/rss/..."
-                        />
-                      </div>
-                      {rssUrls.length > 1 && (
-                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => removeRssUrl(index)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <p className="text-[10px] text-muted-foreground">
-                  The system will attempt to find valid articles from Source #1 first. If no new items are found, it proceeds to #2, etc.
+        <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10">
+          <CardContent className="pt-4">
+            <div className="flex gap-3 items-start">
+              <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-amber-800 dark:text-amber-200">
+                <p className="font-medium">Your API keys are private</p>
+                <p className="text-amber-700 dark:text-amber-300">
+                  Each user provides their own API keys. Your keys are encrypted and only used for your campaigns.
                 </p>
               </div>
-              
-              <div className="flex items-center justify-between border p-4 rounded-lg bg-muted/20">
-                <div className="space-y-0.5">
-                  <Label className="text-base">Deduplication</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Prevent posting the same article URL twice.
-                  </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {settingsLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+          </div>
+        ) : (
+          <div className="grid gap-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Key className="h-5 w-5 text-primary" />
+                  <CardTitle>AI Provider</CardTitle>
                 </div>
-                <Switch defaultChecked />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* API Keys */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Key className="h-5 w-5 text-primary" />
-                <CardTitle>API & Service Credentials</CardTitle>
-              </div>
-              <CardDescription>
-                Configure AI providers, social platforms, and integration services.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-8">
-              
-              {/* AI Provider Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-base">AI Model Configuration</Label>
-                    <p className="text-xs text-muted-foreground">Select your LLM provider for content generation.</p>
-                  </div>
-                </div>
-                
-                <div className="grid gap-4 p-4 border rounded-lg bg-muted/10">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Provider</Label>
-                      <Input placeholder="Custom Provider Name (e.g. OpenAI, Novita, Ollama)" defaultValue="OpenAI" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Model Name</Label>
-                      <Input placeholder="e.g. deepseek/deepseek-v3.2" defaultValue="deepseek/deepseek-v3.2" />
-                    </div>
-                  </div>
-
+                <CardDescription>
+                  Configure your AI model for generating social media captions.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>API Endpoint (Base URL)</Label>
-                    <Input placeholder="https://api.novita.ai/openai" defaultValue="https://api.novita.ai/openai" className="font-mono text-xs" />
+                    <Label htmlFor="aiBaseUrl">API Base URL</Label>
+                    <Input
+                      id="aiBaseUrl"
+                      placeholder="https://api.novita.ai/v3/openai"
+                      value={formData.aiBaseUrl}
+                      onChange={(e) => setFormData(prev => ({ ...prev, aiBaseUrl: e.target.value }))}
+                      className="font-mono text-sm"
+                      data-testid="input-ai-base-url"
+                    />
                   </div>
-
                   <div className="space-y-2">
-                    <Label>API Key</Label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Input 
-                          type={showKeys['ai_key'] ? "text" : "password"} 
-                          placeholder="sk-..." 
-                          className="pr-10 font-mono"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground"
-                          onClick={() => toggleShowKey('ai_key')}
-                        >
-                          {showKeys['ai_key'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                      <Button variant="outline" onClick={() => toast({ title: "Validating API Key", description: "Connection successful! Provider: Novita AI" })}>
-                        Test Key
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 pt-2">
-                    <Label>System Prompt Template</Label>
-                    <textarea 
-                      className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      defaultValue="You are an expert social media manager. Summarize the following news for Instagram..."
+                    <Label htmlFor="aiModel">Model Name</Label>
+                    <Input
+                      id="aiModel"
+                      placeholder="deepseek/deepseek-v3-0324"
+                      value={formData.aiModel}
+                      onChange={(e) => setFormData(prev => ({ ...prev, aiModel: e.target.value }))}
+                      className="font-mono text-sm"
+                      data-testid="input-ai-model"
                     />
                   </div>
                 </div>
-              </div>
-
-              <Separator />
-
-              {/* Data Storage Configuration */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Label className="text-base">Data Storage & Audit</Label>
-                  <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-700 border-slate-200">Local System</Badge>
-                </div>
-                
-                <div className="grid gap-4 p-4 border rounded-lg bg-muted/10">
-                  <div className="space-y-2">
-                    <Label>Storage Method</Label>
-                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                      <option value="local">Local App Storage (JSON Logs)</option>
-                      <option value="db" disabled>PostgreSQL Database (Coming Soon)</option>
-                    </select>
-                    <p className="text-[10px] text-muted-foreground">
-                      Post history and failures will be saved to <code>/logs/posts.json</code> in the application folder.
-                    </p>
-                  </div>
-
-                  <div className="flex items-center justify-between border p-3 rounded-md bg-background">
-                     <div className="space-y-0.5">
-                       <Label className="text-sm">Retention Policy</Label>
-                       <p className="text-[10px] text-muted-foreground">Auto-delete logs older than 30 days</p>
-                     </div>
-                     <Switch defaultChecked />
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Image Source Section */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Image Source</Label>
-                  <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs" onClick={() => {
-                    // In a real implementation this would add a new source object
-                    toast({title: "Added", description: "New image source added"});
-                  }}>
-                    <Plus className="h-3 w-3" /> Add Source
-                  </Button>
-                </div>
-                <div className="grid gap-3">
-                  <select 
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    onChange={(e) => setShowKeys(prev => ({ ...prev, unsplash: e.target.value === 'unsplash', pexels: e.target.value === 'pexels' }))}
-                  >
-                    <option value="wikimedia">Wikimedia Commons (Free/No Key)</option>
-                    <option value="unsplash">Unsplash (Requires Key)</option>
-                    <option value="pexels">Pexels (Requires Key)</option>
-                    <option value="pixabay">Pixabay (Requires Key)</option>
-                  </select>
-
+                <div className="space-y-2">
+                  <Label htmlFor="aiApiKey">API Key</Label>
                   <div className="relative">
-                    <Input 
-                      type={showKeys['image_api'] ? "text" : "password"} 
-                      placeholder="Image Service API Key (if required)" 
+                    <Input
+                      id="aiApiKey"
+                      type={showKeys['ai'] ? "text" : "password"}
+                      placeholder="sk-..."
+                      value={formData.aiApiKey}
+                      onChange={(e) => setFormData(prev => ({ ...prev, aiApiKey: e.target.value }))}
                       className="pr-10 font-mono"
+                      data-testid="input-ai-api-key"
                     />
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground"
-                      onClick={() => toggleShowKey('image_api')}
+                      className="absolute right-0 top-0 h-full px-3"
+                      onClick={() => toggleShowKey('ai')}
+                      data-testid="button-toggle-ai-key"
                     >
-                      {showKeys['image_api'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showKeys['ai'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Works with any OpenAI-compatible API (Novita AI, OpenAI, Together AI, etc.)
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Key className="h-5 w-5 text-primary" />
+                  <CardTitle>Postly Publishing</CardTitle>
+                </div>
+                <CardDescription>
+                  Your Postly API key for publishing to social media platforms.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Label htmlFor="postlyApiKey">API Key</Label>
+                <div className="relative">
+                  <Input
+                    id="postlyApiKey"
+                    type={showKeys['postly'] ? "text" : "password"}
+                    placeholder="postly_..."
+                    value={formData.postlyApiKey}
+                    onChange={(e) => setFormData(prev => ({ ...prev, postlyApiKey: e.target.value }))}
+                    className="pr-10 font-mono"
+                    data-testid="input-postly-api-key"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3"
+                    onClick={() => toggleShowKey('postly')}
+                    data-testid="button-toggle-postly-key"
+                  >
+                    {showKeys['postly'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Key className="h-5 w-5 text-primary" />
+                  <CardTitle>Image Services</CardTitle>
+                  <Badge variant="secondary" className="text-xs">Optional</Badge>
+                </div>
+                <CardDescription>
+                  API keys for Unsplash and Pexels image search. Wikimedia Commons works without a key.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="unsplashAccessKey">Unsplash Access Key</Label>
+                  <div className="relative">
+                    <Input
+                      id="unsplashAccessKey"
+                      type={showKeys['unsplash'] ? "text" : "password"}
+                      placeholder="Access Key"
+                      value={formData.unsplashAccessKey}
+                      onChange={(e) => setFormData(prev => ({ ...prev, unsplashAccessKey: e.target.value }))}
+                      className="pr-10 font-mono"
+                      data-testid="input-unsplash-key"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3"
+                      onClick={() => toggleShowKey('unsplash')}
+                    >
+                      {showKeys['unsplash'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
-              </div>
-
-              <Separator />
-
-              {/* Postly Section */}
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <Label>Postly Configuration</Label>
-                  <p className="text-[10px] text-muted-foreground">Manage your connection to the Postly scheduling engine.</p>
-                </div>
-
-                <div className="grid gap-4 p-4 border rounded-lg bg-muted/10">
-                   <div className="space-y-2">
-                    <Label>API Key</Label>
-                    <div className="relative">
-                      <Input 
-                        type={showKeys['postly'] ? "text" : "password"} 
-                        placeholder="postly_..." 
-                        className="pr-10 font-mono"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground"
-                        onClick={() => toggleShowKey('postly')}
-                      >
-                        {showKeys['postly'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Workspace ID</Label>
-                    <Input placeholder="ws_..." className="font-mono" />
-                  </div>
-
-                  <div className="space-y-3 pt-2">
-                    <Label>Target Platforms</Label>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {[
-                        { id: "instagram", label: "Instagram" },
-                        { id: "facebook", label: "Facebook" },
-                        { id: "twitter", label: "Twitter (X)" },
-                        { id: "linkedin", label: "LinkedIn" },
-                        { id: "pinterest", label: "Pinterest" },
-                        { id: "tiktok", label: "TikTok" },
-                        { id: "youtube", label: "YouTube" },
-                        { id: "telegram", label: "Telegram" }
-                      ].map((platform) => (
-                        <div 
-                          key={platform.id}
-                          className={`
-                            flex items-center space-x-2 border rounded-md p-3 cursor-pointer transition-colors
-                            ${selectedPlatforms.includes(platform.id) 
-                              ? "bg-primary/10 border-primary" 
-                              : "hover:bg-muted/50 border-input"}
-                          `}
-                          onClick={() => togglePlatform(platform.id)}
-                        >
-                          <Checkbox 
-                            id={platform.id} 
-                            checked={selectedPlatforms.includes(platform.id)}
-                            onCheckedChange={() => togglePlatform(platform.id)}
-                            className="pointer-events-none" 
-                          />
-                          <label
-                            htmlFor={platform.id}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer pointer-events-none"
-                          >
-                            {platform.label}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">
-                      Select which social accounts connected in Postly should receive the automated content.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-            </CardContent>
-          </Card>
-
-          {/* Safety Settings */}
-          <Card className="border-amber-200 dark:border-amber-900 bg-amber-50/10 dark:bg-amber-900/10">
-            <CardHeader>
-              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
-                <ShieldAlert className="h-5 w-5" />
-                <CardTitle>Safety Constraints</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Max Caption Length</Label>
-                  <Input type="number" defaultValue={1900} />
-                  <p className="text-[10px] text-muted-foreground">Hard limit for IG safety buffer.</p>
+                  <Label htmlFor="pexelsApiKey">Pexels API Key</Label>
+                  <div className="relative">
+                    <Input
+                      id="pexelsApiKey"
+                      type={showKeys['pexels'] ? "text" : "password"}
+                      placeholder="API Key"
+                      value={formData.pexelsApiKey}
+                      onChange={(e) => setFormData(prev => ({ ...prev, pexelsApiKey: e.target.value }))}
+                      className="pr-10 font-mono"
+                      data-testid="input-pexels-key"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3"
+                      onClick={() => toggleShowKey('pexels')}
+                    >
+                      {showKeys['pexels'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Max Auto-Retries</Label>
-                  <Input type="number" defaultValue={3} />
-                  <p className="text-[10px] text-muted-foreground">Attempts before marking as failed.</p>
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label>Forbidden Terms</Label>
-                  <Input defaultValue="cure, miracle, guarantee, treat" />
-                  <p className="text-[10px] text-muted-foreground">Comma separated words that trigger a halt.</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <div className="flex justify-end pt-4">
-            <Button size="lg" className="gap-2 shadow-lg shadow-primary/25" onClick={handleSave}>
-              <Save className="h-4 w-4" />
-              Save Changes
-            </Button>
+            <Separator />
+
+            <div className="flex justify-end">
+              <Button 
+                size="lg" 
+                className="gap-2 shadow-lg shadow-primary/25" 
+                onClick={handleSave}
+                disabled={saveMutation.isPending}
+                data-testid="button-save-settings"
+              >
+                {saveMutation.isPending ? (
+                  <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Save Settings
+              </Button>
+            </div>
           </div>
-
-        </div>
+        )}
       </div>
     </Layout>
   );

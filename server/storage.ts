@@ -1,12 +1,11 @@
-import { campaigns, posts, logs, users, type Campaign, type InsertCampaign, type Post, type InsertPost, type Log, type InsertLog, type User, type InsertUser } from "@shared/schema";
+import { campaigns, posts, logs, userSettings, type Campaign, type InsertCampaign, type Post, type InsertPost, type Log, type InsertLog, type UserSettings, type InsertUserSettings } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
-  // User methods
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  // User settings methods
+  getUserSettings(userId: string): Promise<UserSettings | undefined>;
+  upsertUserSettings(settings: InsertUserSettings): Promise<UserSettings>;
   
   // Campaign methods
   getCampaign(id: number): Promise<Campaign | undefined>;
@@ -33,24 +32,31 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   // ============================================
-  // User Methods
+  // User Settings Methods
   // ============================================
-  async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user || undefined;
+  async getUserSettings(userId: string): Promise<UserSettings | undefined> {
+    const [settings] = await db.select().from(userSettings).where(eq(userSettings.userId, userId));
+    return settings || undefined;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user || undefined;
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values(insertUser)
+  async upsertUserSettings(settings: InsertUserSettings): Promise<UserSettings> {
+    const [result] = await db
+      .insert(userSettings)
+      .values(settings)
+      .onConflictDoUpdate({
+        target: userSettings.userId,
+        set: {
+          aiApiKey: settings.aiApiKey,
+          aiBaseUrl: settings.aiBaseUrl,
+          aiModel: settings.aiModel,
+          postlyApiKey: settings.postlyApiKey,
+          unsplashAccessKey: settings.unsplashAccessKey,
+          pexelsApiKey: settings.pexelsApiKey,
+          updatedAt: new Date(),
+        },
+      })
       .returning();
-    return user;
+    return result;
   }
 
   // ============================================

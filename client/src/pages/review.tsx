@@ -74,6 +74,12 @@ export default function Review() {
   useEffect(() => {
     if (posts.length > 0 && posts[selectedPostIndex]) {
       setCaption(posts[selectedPostIndex].generatedCaption || "");
+      
+      // Smart default scheduling
+      const now = new Date();
+      const defaultDate = new Date(now.getTime() + 3600000);
+      setScheduleDate(defaultDate.toISOString().split('T')[0]);
+      setScheduleTime(defaultDate.toTimeString().split(' ')[0].substring(0, 5));
     }
   }, [selectedPostIndex, posts]);
 
@@ -261,18 +267,30 @@ export default function Review() {
     }
   };
 
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+
   const handleSchedule = async () => {
     if (!currentPost) return;
 
     try {
-      const scheduleTime = new Date(Date.now() + 3600000);
+      const scheduledFor = new Date(`${scheduleDate}T${scheduleTime}`);
+      if (isNaN(scheduledFor.getTime())) {
+        toast({
+          title: "Invalid Date",
+          description: "Please select a valid date and time.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const response = await fetch(`/api/posts/${currentPost.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status: "scheduled",
           generatedCaption: caption,
-          scheduledFor: scheduleTime.toISOString(),
+          scheduledFor: scheduledFor.toISOString(),
         }),
       });
 
@@ -290,14 +308,14 @@ export default function Review() {
           campaignId: currentPost.campaignId,
           postId: currentPost.id,
           level: "info",
-          message: `Post "${currentPost.sourceTitle}" scheduled for ${scheduleTime.toLocaleString()}`,
-          metadata: { scheduledFor: scheduleTime.toISOString() }
+          message: `Post "${currentPost.sourceTitle}" scheduled for ${scheduledFor.toLocaleString()}`,
+          metadata: { scheduledFor: scheduledFor.toISOString() }
         }),
       });
 
       toast({
         title: "Scheduled",
-        description: `Post queued for ${scheduleTime.toLocaleString()}.`,
+        description: `Post queued for ${scheduledFor.toLocaleString()}.`,
       });
 
       await fetchPosts(activeCampaign?.id);
@@ -589,6 +607,26 @@ export default function Review() {
               <Save className="h-4 w-4" />
               Save Draft
             </Button>
+            <div className="flex flex-col gap-2 p-3 border rounded-lg bg-muted/30">
+              <div className="flex items-center gap-2">
+                <CalendarClock className="h-4 w-4 text-primary" />
+                <span className="text-xs font-medium">Scheduling</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  className="h-8 text-xs px-2"
+                />
+                <Input
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="h-8 text-xs px-2"
+                />
+              </div>
+            </div>
             <Button
               variant="outline"
               className="gap-2"

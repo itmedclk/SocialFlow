@@ -369,6 +369,47 @@ export default function Review() {
     }
   };
 
+  const handleReprocess = async () => {
+    if (!currentPost || !activeCampaign) return;
+    
+    setGenerating(true);
+    try {
+      const response = await fetch(`/api/posts/${currentPost.id}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: prompt || activeCampaign.aiPrompt,
+          campaignId: activeCampaign.id,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to re-process post");
+      }
+
+      toast({
+        title: "Post Re-processed",
+        description: "The post has been re-processed with the latest safety rules.",
+      });
+
+      if (result.post) {
+        setCaption(result.post.generatedCaption || "");
+      }
+      
+      await fetchPosts(activeCampaign?.id);
+    } catch (error) {
+      toast({
+        title: "Re-processing Failed",
+        description: error instanceof Error ? error.message : "Failed to re-process",
+        variant: "destructive",
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const [generating, setGenerating] = useState(false);
   const [searchingImage, setSearchingImage] = useState(false);
 
@@ -675,14 +716,14 @@ export default function Review() {
                       >
                         <CalendarClock className="h-3 w-3" />
                         {currentPost.status === 'failed' ? 'Failed: ' : 'Scheduled: '}
-                        {new Date(currentPost.scheduledFor).toLocaleString('en-GB', { 
+                        {currentPost.scheduledFor ? new Date(currentPost.scheduledFor).toLocaleString('en-GB', { 
                           day: '2-digit', 
                           month: '2-digit', 
                           year: 'numeric', 
                           hour: '2-digit', 
                           minute: '2-digit',
                           hour12: false 
-                        })}
+                        }) : 'N/A'}
                       </Badge>
                     <Badge variant="secondary" className="capitalize">{currentPost?.status || "Draft"}</Badge>
                   </div>
@@ -713,6 +754,16 @@ export default function Review() {
                     <p className="text-xs text-destructive/80 italic">
                       {currentPost.failureReason}
                     </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleReprocess}
+                      disabled={generating}
+                      className="mt-2 h-7 text-[10px] gap-1 border-destructive/20 hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${generating ? 'animate-spin' : ''}`} />
+                      Re-process Post
+                    </Button>
                   </div>
                 )}
               </CardContent>

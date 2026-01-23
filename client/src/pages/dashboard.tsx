@@ -13,13 +13,78 @@ import {
   FileCheck,
   Instagram,
   RefreshCw,
-  Clock
+  Clock,
+  Layers,
+  FileText
 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link } from "wouter";
+import { useToast } from "@/hooks/use-toast";
+
+interface DashboardStats {
+  totalCampaigns: number;
+  activeCampaigns: number;
+  totalPosts: number;
+  drafts: number;
+  scheduled: number;
+  posted: number;
+  failed: number;
+  pendingReview: number;
+  recentActivity: any[];
+}
 
 export default function Dashboard() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [fetching, setFetching] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const response = await fetch('/api/stats');
+      if (!response.ok) throw new Error('Failed to fetch stats');
+      const data = await response.json();
+      setStats(data);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTriggerRun = async () => {
+    setFetching(true);
+    try {
+      const response = await fetch('/api/fetch-all', { method: 'POST' });
+      if (!response.ok) throw new Error('Failed to trigger fetch');
+      
+      toast({
+        title: "RSS Fetch Started",
+        description: "Fetching new content from all active campaigns...",
+      });
+      
+      setTimeout(fetchStats, 2000);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to trigger RSS fetch",
+        variant: "destructive",
+      });
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const successRate = stats && stats.totalPosts > 0 
+    ? Math.round(((stats.posted) / stats.totalPosts) * 100) 
+    : 0;
+
   return (
     <Layout>
-      {/* Hero Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
@@ -28,27 +93,37 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2">
-            <FileCheck className="h-4 w-4" />
-            View Audit Log
-          </Button>
-          <Button className="gap-2 shadow-lg shadow-primary/25">
-            <RefreshCw className="h-4 w-4" />
-            Trigger Run Now
+          <Link href="/logs">
+            <Button variant="outline" className="gap-2" data-testid="button-view-logs">
+              <FileCheck className="h-4 w-4" />
+              View Audit Log
+            </Button>
+          </Link>
+          <Button 
+            className="gap-2 shadow-lg shadow-primary/25" 
+            onClick={handleTriggerRun}
+            disabled={fetching}
+            data-testid="button-trigger-run"
+          >
+            <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
+            {fetching ? 'Fetching...' : 'Trigger Run Now'}
           </Button>
         </div>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-card/50 backdrop-blur shadow-sm hover:shadow-md transition-all border-primary/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Next Schedule</CardTitle>
-            <Clock className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active Campaigns</CardTitle>
+            <Layers className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">09:00 PST</div>
-            <p className="text-xs text-muted-foreground mt-1">in 14 hours 32 mins</p>
+            <div className="text-2xl font-bold" data-testid="stat-active-campaigns">
+              {loading ? "..." : stats?.activeCampaigns || 0}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              of {stats?.totalCampaigns || 0} total campaigns
+            </p>
           </CardContent>
         </Card>
         
@@ -58,35 +133,46 @@ export default function Dashboard() {
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">98.5%</div>
-            <p className="text-xs text-muted-foreground mt-1">+2.1% from last month</p>
+            <div className="text-2xl font-bold text-emerald-600" data-testid="stat-success-rate">
+              {loading ? "..." : `${successRate}%`}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats?.posted || 0} posts published
+            </p>
           </CardContent>
         </Card>
 
         <Card className="bg-card/50 backdrop-blur shadow-sm hover:shadow-md transition-all border-indigo-500/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Posts Created</CardTitle>
-            <Instagram className="h-4 w-4 text-indigo-500" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Posts</CardTitle>
+            <FileText className="h-4 w-4 text-indigo-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-indigo-600">342</div>
-            <p className="text-xs text-muted-foreground mt-1">Total automated posts</p>
+            <div className="text-2xl font-bold text-indigo-600" data-testid="stat-total-posts">
+              {loading ? "..." : stats?.totalPosts || 0}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats?.drafts || 0} pending review
+            </p>
           </CardContent>
         </Card>
 
         <Card className="bg-card/50 backdrop-blur shadow-sm hover:shadow-md transition-all border-amber-500/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Safety Flags</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Failed Posts</CardTitle>
             <AlertTriangle className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-600">3</div>
-            <p className="text-xs text-muted-foreground mt-1">Posts blocked this month</p>
+            <div className="text-2xl font-bold text-amber-600" data-testid="stat-failed">
+              {loading ? "..." : stats?.failed || 0}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats?.scheduled || 0} scheduled
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Pipeline View */}
       <Card className="border-border/60 shadow-lg">
         <CardHeader>
           <CardTitle>Live Execution Status</CardTitle>
@@ -98,46 +184,40 @@ export default function Dashboard() {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Logs */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-lg">System Logs</h3>
-            <Badge variant="outline" className="font-mono text-xs">ID: run_8f3d2a1</Badge>
+            <Link href="/logs">
+              <Badge variant="outline" className="font-mono text-xs cursor-pointer hover:bg-muted">
+                View All
+              </Badge>
+            </Link>
           </div>
           <LogViewer />
         </div>
 
-        {/* Generated Content Preview */}
         <div className="space-y-4">
-          <h3 className="font-semibold text-lg">Content Preview</h3>
+          <h3 className="font-semibold text-lg">Quick Actions</h3>
           <Card className="overflow-hidden border-border/60 shadow-md">
-            <div className="relative aspect-square w-full bg-muted">
-              <img 
-                src="/sample-post.jpg" 
-                alt="Post Preview" 
-                className="object-cover w-full h-full hover:scale-105 transition-transform duration-500"
-              />
-              <div className="absolute top-3 right-3 bg-black/50 backdrop-blur text-white text-xs px-2 py-1 rounded-md">
-                Pending Approval
-              </div>
-            </div>
             <CardContent className="p-4 space-y-3">
-              <div className="flex items-start justify-between">
-                <Badge variant="secondary" className="text-xs font-normal bg-blue-50 text-blue-700 border-blue-100">
-                  Healthy Lifestyle
-                </Badge>
-                <span className="text-xs text-muted-foreground">1,450 chars</span>
-              </div>
-              <p className="text-sm text-foreground/80 line-clamp-4 leading-relaxed">
-                ✨ Discover the power of mindfulness in your daily routine. Recent studies suggest that just 10 minutes a day can significantly reduce stress levels...
-                <br/><br/>
-                This content is for informational purposes only and is not medical advice.
-              </p>
-              <div className="pt-2 flex flex-wrap gap-1">
-                {["#mindfulness", "#health", "#wellness", "#holistic"].map(tag => (
-                  <span key={tag} className="text-xs text-blue-600 font-medium">{tag}</span>
-                ))}
-              </div>
+              <Link href="/campaigns/new">
+                <Button variant="outline" className="w-full justify-start gap-2">
+                  <Layers className="h-4 w-4" />
+                  Create New Campaign
+                </Button>
+              </Link>
+              <Link href="/review">
+                <Button variant="outline" className="w-full justify-start gap-2">
+                  <FileText className="h-4 w-4" />
+                  Review Pending Posts ({stats?.pendingReview || 0})
+                </Button>
+              </Link>
+              <Link href="/campaigns">
+                <Button variant="outline" className="w-full justify-start gap-2">
+                  <CalendarDays className="h-4 w-4" />
+                  Manage Campaigns
+                </Button>
+              </Link>
             </CardContent>
           </Card>
         </div>

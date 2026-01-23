@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertCampaignSchema, insertPostSchema, insertLogSchema } from "@shared/schema";
 import { z } from "zod";
+import { processCampaignFeeds, processAllActiveCampaigns } from "./services/rss";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -262,6 +263,80 @@ export async function registerRoutes(
       }
       console.error("Error creating log:", error);
       res.status(500).json({ error: "Failed to create log" });
+    }
+  });
+
+  // ============================================
+  // RSS Routes
+  // ============================================
+  
+  app.post("/api/campaigns/:id/fetch", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid campaign ID" });
+      }
+
+      const result = await processCampaignFeeds(id);
+      res.json({
+        success: true,
+        message: `Fetched ${result.new} new articles from ${result.fetched} total`,
+        ...result
+      });
+    } catch (error) {
+      console.error("Error fetching RSS feeds:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to fetch RSS feeds" 
+      });
+    }
+  });
+
+  app.post("/api/fetch-all", async (req, res) => {
+    try {
+      await processAllActiveCampaigns();
+      res.json({ success: true, message: "Started fetching all active campaigns" });
+    } catch (error) {
+      console.error("Error fetching all campaigns:", error);
+      res.status(500).json({ error: "Failed to fetch campaigns" });
+    }
+  });
+
+  // ============================================
+  // Dashboard Stats
+  // ============================================
+  
+  app.get("/api/stats", async (req, res) => {
+    try {
+      const campaigns = await storage.getAllCampaigns();
+      const activeCampaigns = campaigns.filter(c => c.isActive);
+      
+      const allPosts: any[] = [];
+      for (const campaign of campaigns) {
+        const posts = await storage.getPostsByCampaign(campaign.id, 1000);
+        allPosts.push(...posts);
+      }
+      
+      const drafts = allPosts.filter(p => p.status === 'draft');
+      const scheduled = allPosts.filter(p => p.status === 'scheduled');
+      const posted = allPosts.filter(p => p.status === 'posted');
+      const failed = allPosts.filter(p => p.status === 'failed');
+      
+      const recentLogs = await storage.getAllLogs(50);
+      
+      res.json({
+        totalCampaigns: campaigns.length,
+        activeCampaigns: activeCampaigns.length,
+        totalPosts: allPosts.length,
+        drafts: drafts.length,
+        scheduled: scheduled.length,
+        posted: posted.length,
+        failed: failed.length,
+        pendingReview: drafts.length,
+        recentActivity: recentLogs.slice(0, 10),
+      });
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+      res.status(500).json({ error: "Failed to fetch stats" });
     }
   });
 

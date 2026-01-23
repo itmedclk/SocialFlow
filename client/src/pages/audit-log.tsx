@@ -6,104 +6,86 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Download, AlertCircle, CheckCircle2, RefreshCw, FileJson, Filter } from "lucide-react";
+import { Search, Download, AlertCircle, CheckCircle2, RefreshCw, FileJson, Filter, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import type { Campaign, Log } from "@shared/schema";
 
-interface PostRecord {
-  id: string;
-  campaignId: string;
-  date: string;
-  title: string;
-  caption_snippet: string;
-  image_credit: string;
-  status: "success" | "failed";
-  reason?: string;
-  retry_count: number;
-  guid: string;
+function formatMetadata(metadata: unknown): string {
+  if (!metadata) return "";
+  try {
+    return JSON.stringify(metadata);
+  } catch {
+    return String(metadata);
+  }
 }
 
-const MOCK_CAMPAIGNS = [
-  { id: "1", name: "Alternative Health Daily", logFile: "health_daily_posts.json" },
-  { id: "2", name: "Tech Startup News", logFile: "tech_news_posts.json" },
-  { id: "3", name: "Motivational Quotes", logFile: "quotes_posts.json" }
-];
-
-const MOCK_DATA: PostRecord[] = [
-  {
-    id: "101",
-    campaignId: "1",
-    date: "2026-01-22 09:00",
-    title: "New Study Shows Benefits of Mindfulness",
-    caption_snippet: "✨ Discover the power of mindfulness...",
-    image_credit: "Unsplash/Sarah",
-    status: "success",
-    retry_count: 0,
-    guid: "rss:health:89231"
-  },
-  {
-    id: "102",
-    campaignId: "1",
-    date: "2026-01-21 09:00",
-    title: "Top 5 Herbal Teas for Sleep",
-    caption_snippet: "Sleep better tonight with these...",
-    image_credit: "Pexels/TeaCo",
-    status: "success",
-    retry_count: 0,
-    guid: "rss:health:89102"
-  },
-  {
-    id: "103",
-    campaignId: "1",
-    date: "2026-01-20 09:02",
-    title: "Warning: Vitamin D Overdose Risks",
-    caption_snippet: "Important safety update regarding...",
-    image_credit: "Wikimedia",
-    status: "failed",
-    reason: "Max retries exceeded (Caption safety check)",
-    retry_count: 4,
-    guid: "rss:health:88991"
-  },
-  {
-    id: "201",
-    campaignId: "2",
-    date: "2026-01-22 08:30",
-    title: "AI Regulation: What You Need to Know",
-    caption_snippet: "🤖 The future of AI policy is here...",
-    image_credit: "Unsplash/TechDaily",
-    status: "success",
-    retry_count: 1,
-    guid: "rss:tech:44211"
-  },
-  {
-    id: "202",
-    campaignId: "2",
-    date: "2026-01-21 08:30",
-    title: "SpaceX Launches New Starlink Satellites",
-    caption_snippet: "🚀 Another successful launch...",
-    image_credit: "SpaceX/Official",
-    status: "success",
-    retry_count: 0,
-    guid: "rss:tech:44105"
-  },
-  {
-    id: "301",
-    campaignId: "3",
-    date: "2026-01-22 10:00",
-    title: "Quote of the Day",
-    caption_snippet: "\"Believe you can and you're halfway there.\"",
-    image_credit: "Canva/Generated",
-    status: "success",
-    retry_count: 0,
-    guid: "rss:quotes:1102"
-  }
-];
-
 export default function AuditLog() {
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string>("1");
-  const activeCampaign = MOCK_CAMPAIGNS.find(c => c.id === selectedCampaignId) || MOCK_CAMPAIGNS[0];
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [logs, setLogs] = useState<Log[]>([]);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>("all");
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    fetchCampaigns();
+    fetchLogs();
+  }, []);
+
+  useEffect(() => {
+    fetchLogs();
+  }, [selectedCampaignId]);
+
+  const fetchCampaigns = async () => {
+    try {
+      const response = await fetch('/api/campaigns');
+      if (!response.ok) throw new Error('Failed to fetch campaigns');
+      const data = await response.json();
+      setCampaigns(data);
+    } catch (error) {
+      console.error('Error fetching campaigns:', error);
+    }
+  };
+
+  const fetchLogs = async () => {
+    try {
+      setLoading(true);
+      const url = selectedCampaignId !== "all" 
+        ? `/api/logs?campaignId=${selectedCampaignId}&limit=100`
+        : '/api/logs?limit=100';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch logs');
+      const data = await response.json();
+      setLogs(data);
+    } catch (error) {
+      console.error('Error fetching logs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activeCampaign = campaigns.find(c => c.id.toString() === selectedCampaignId);
   
-  const filteredData = MOCK_DATA.filter(record => record.campaignId === selectedCampaignId);
+  const filteredLogs = logs.filter(log => 
+    searchTerm === "" || 
+    log.message.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const formatDateTime = (date: Date | string | null) => {
+    if (!date) return "--";
+    return new Date(date).toLocaleString();
+  };
+
+  const getLevelIcon = (level: string) => {
+    switch (level) {
+      case "error":
+        return <AlertCircle className="h-3 w-3" />;
+      case "warning":
+        return <AlertCircle className="h-3 w-3" />;
+      default:
+        return <Info className="h-3 w-3" />;
+    }
+  };
 
   return (
     <Layout>
@@ -112,32 +94,35 @@ export default function AuditLog() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Audit Logs</h1>
             <p className="text-muted-foreground mt-1">
-              Historical record of all automated posts and execution attempts.
+              Historical record of all system events and execution attempts.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 items-end sm:items-center">
              <div className="w-[250px]">
                <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
-                 <SelectTrigger className="h-9">
+                 <SelectTrigger className="h-9" data-testid="select-campaign-filter">
                    <div className="flex items-center gap-2">
                      <Filter className="h-3.5 w-3.5 text-muted-foreground" />
                      <SelectValue placeholder="Select Campaign Log" />
                    </div>
                  </SelectTrigger>
                  <SelectContent>
-                   {MOCK_CAMPAIGNS.map(campaign => (
-                     <SelectItem key={campaign.id} value={campaign.id}>
+                   <SelectItem value="all">All Campaigns</SelectItem>
+                   {campaigns.map(campaign => (
+                     <SelectItem key={campaign.id} value={campaign.id.toString()}>
                        {campaign.name}
                      </SelectItem>
                    ))}
                  </SelectContent>
                </Select>
              </div>
-            <Button variant="outline" className="gap-2 h-9 text-xs font-mono hidden md:flex">
-              <FileJson className="h-3.5 w-3.5" />
-              /logs/{activeCampaign.logFile}
-            </Button>
-            <Button variant="secondary" size="icon" className="h-9 w-9">
+            <Button 
+              variant="secondary" 
+              size="icon" 
+              className="h-9 w-9"
+              onClick={fetchLogs}
+              data-testid="button-refresh-logs"
+            >
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
@@ -147,87 +132,88 @@ export default function AuditLog() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Post History: {activeCampaign.name}</CardTitle>
-                <CardDescription className="mt-1 font-mono text-xs">
-                  Source: /var/log/socialflow/{activeCampaign.logFile}
+                <CardTitle>
+                  {activeCampaign ? `Logs: ${activeCampaign.name}` : "All System Logs"}
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  {filteredLogs.length} log entries
                 </CardDescription>
               </div>
               <div className="relative w-64 hidden sm:block">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search logs..." className="pl-8 h-9" />
+                <Input 
+                  placeholder="Search logs..." 
+                  className="pl-8 h-9"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  data-testid="input-search-logs"
+                />
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[150px]">Date & Time</TableHead>
-                  <TableHead className="w-[80px]">Status</TableHead>
-                  <TableHead>Article Title</TableHead>
-                  <TableHead className="hidden md:table-cell">Caption Snippet</TableHead>
-                  <TableHead className="hidden md:table-cell">Image Credit</TableHead>
-                  <TableHead className="text-center w-[80px]">Retries</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredData.length > 0 ? (
-                  filteredData.map((record) => (
-                    <TableRow key={record.id} className="group hover:bg-muted/50 transition-colors">
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {record.date}
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant="outline" 
-                          className={cn(
-                            "text-[10px] flex w-fit gap-1 items-center border-0 px-2 py-0.5",
-                            record.status === "success" 
-                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400" 
-                              : "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
+            {loading ? (
+              <div className="text-center py-12 text-muted-foreground">
+                Loading logs...
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[180px]">Date & Time</TableHead>
+                    <TableHead className="w-[100px]">Level</TableHead>
+                    <TableHead>Message</TableHead>
+                    <TableHead className="hidden lg:table-cell">Details</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredLogs.length > 0 ? (
+                    filteredLogs.map((log) => (
+                      <TableRow key={log.id} className="group hover:bg-muted/50 transition-colors">
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {formatDateTime(log.createdAt)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant="outline" 
+                            className={cn(
+                              "text-[10px] flex w-fit gap-1 items-center border-0 px-2 py-0.5",
+                              log.level === "info" && "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400",
+                              log.level === "warning" && "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400",
+                              log.level === "error" && "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
+                            )}
+                          >
+                            {getLevelIcon(log.level)}
+                            {log.level}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium text-sm">{log.message}</div>
+                          {log.campaignId && (
+                            <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
+                              Campaign ID: {log.campaignId}
+                            </div>
                           )}
-                        >
-                          {record.status === "success" ? <CheckCircle2 className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
-                          {record.status === "success" ? "Posted" : "Failed"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium text-sm line-clamp-1">{record.title}</div>
-                        <div className="text-[10px] text-muted-foreground font-mono mt-0.5">GUID: {record.guid}</div>
-                        {record.reason && (
-                           <div className="text-[10px] text-red-600 font-medium mt-1">Error: {record.reason}</div>
-                        )}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <span className="text-muted-foreground text-xs italic line-clamp-1 max-w-[200px]">
-                          "{record.caption_snippet}"
-                        </span>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <span className="text-xs">{record.image_credit}</span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {record.retry_count > 0 ? (
-                          <Badge variant="secondary" className="text-[10px] h-5">{record.retry_count}</Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                         <Button variant="ghost" size="sm" className="h-8 text-xs">Details</Button>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          {log.metadata && (
+                            <span className="text-muted-foreground text-xs font-mono line-clamp-1 max-w-[300px]">
+                              {formatMetadata(log.metadata)}
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                        No logs found.
                       </TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                      No logs found for this campaign.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff, Save, Globe, Key, ShieldAlert, Clock, Plus, Trash2, ArrowLeft, Layers } from "lucide-react";
+import { Eye, EyeOff, Save, Globe, Key, ShieldAlert, Clock, Plus, Trash2, ArrowLeft, Layers, Image as ImageIcon } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
@@ -16,6 +16,9 @@ export default function CampaignEditor() {
   const [showKeys, setShowKeys] = useState<Record<string, any>>({});
   const [rssUrls, setRssUrls] = useState<string[]>([
     "https://news.google.com/rss/search?q=technology&hl=en-US&gl=US&ceid=US:en"
+  ]);
+  const [imageSources, setImageSources] = useState<{type: string, value: string}[]>([
+    { type: "unsplash", value: "technology, startup, business" }
   ]);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["twitter", "linkedin"]);
   const { toast } = useToast();
@@ -38,6 +41,22 @@ export default function CampaignEditor() {
     const newUrls = [...rssUrls];
     newUrls[index] = value;
     setRssUrls(newUrls);
+  };
+
+  const addImageSource = () => {
+    setImageSources([...imageSources, { type: "unsplash", value: "" }]);
+  };
+
+  const removeImageSource = (index: number) => {
+    const newSources = [...imageSources];
+    newSources.splice(index, 1);
+    setImageSources(newSources);
+  };
+
+  const updateImageSource = (index: number, field: 'type' | 'value', value: string) => {
+    const newSources = [...imageSources];
+    newSources[index] = { ...newSources[index], [field]: value };
+    setImageSources(newSources);
   };
 
   const togglePlatform = (platform: string) => {
@@ -171,6 +190,60 @@ export default function CampaignEditor() {
                       </div>
                     ))}
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Image Sources */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="h-5 w-5 text-primary" />
+                  <CardTitle>Image Sources</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Configured Image Providers</Label>
+                    <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs" onClick={addImageSource}>
+                      <Plus className="h-3 w-3" /> Add Source
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {imageSources.map((source, index) => (
+                      <div key={index} className="flex gap-2 items-start">
+                        <div className="w-[140px]">
+                           <select 
+                             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                             value={source.type}
+                             onChange={(e) => updateImageSource(index, 'type', e.target.value)}
+                           >
+                             <option value="unsplash">Unsplash</option>
+                             <option value="pexels">Pexels</option>
+                             <option value="wikimedia">Wikimedia</option>
+                             <option value="google">Google Images</option>
+                           </select>
+                        </div>
+                        <div className="relative flex-1">
+                          <Input 
+                            value={source.value}
+                            onChange={(e) => updateImageSource(index, 'value', e.target.value)}
+                            placeholder="Search keywords (e.g. nature, tech)"
+                            className="text-sm"
+                          />
+                        </div>
+                        {imageSources.length > 1 && (
+                          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => removeImageSource(index)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-2">
+                    The system will attempt to find images from these sources in order of priority.
+                  </p>
                 </div>
               </CardContent>
             </Card>

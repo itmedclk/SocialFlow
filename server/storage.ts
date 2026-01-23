@@ -1,6 +1,6 @@
 import { campaigns, posts, logs, userSettings, type Campaign, type InsertCampaign, type Post, type InsertPost, type Log, type InsertLog, type UserSettings, type InsertUserSettings } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 export interface IStorage {
   // User settings methods
@@ -124,7 +124,7 @@ export class DatabaseStorage implements IStorage {
   async createPost(insertPost: InsertPost): Promise<Post> {
     const [post] = await db
       .insert(posts)
-      .values(insertPost)
+      .values(insertPost as any)
       .returning();
     return post;
   }
@@ -132,7 +132,7 @@ export class DatabaseStorage implements IStorage {
   async updatePost(id: number, updateData: Partial<InsertPost>): Promise<Post | undefined> {
     const [post] = await db
       .update(posts)
-      .set({ ...updateData, updatedAt: new Date() })
+      .set({ ...updateData, updatedAt: new Date() } as any)
       .where(eq(posts.id, id))
       .returning();
     return post || undefined;
@@ -142,24 +142,24 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(posts)
-      .where(eq(posts.status, 'scheduled'))
+      .where(eq(posts.status, 'scheduled' as any))
       .orderBy(posts.scheduledFor);
   }
 
   async getDraftPosts(campaignId?: number): Promise<Post[]> {
+    const draftStatus = "draft" as const;
     if (campaignId !== undefined) {
       return await db
         .select()
         .from(posts)
-        .where(eq(posts.campaignId, campaignId))
-        .where(eq(posts.status, "draft"))
+        .where(and(eq(posts.campaignId, campaignId), eq(posts.status, draftStatus)))
         .orderBy(desc(posts.pubDate), desc(posts.createdAt));
     }
     
     return await db
       .select()
       .from(posts)
-      .where(eq(posts.status, "draft"))
+      .where(eq(posts.status, draftStatus))
       .orderBy(desc(posts.pubDate), desc(posts.createdAt));
   }
 
@@ -169,7 +169,7 @@ export class DatabaseStorage implements IStorage {
   async createLog(insertLog: InsertLog): Promise<Log> {
     const [log] = await db
       .insert(logs)
-      .values(insertLog)
+      .values(insertLog as any)
       .returning();
     return log;
   }

@@ -60,10 +60,12 @@ export async function publishToPostly(
   };
 
   if (post.imageUrl) {
+    const isPexels = post.imageUrl.includes("pexels.com");
+    const isWikimedia = post.imageUrl.includes("wikimedia.org");
     payload.media = [
       {
         url: post.imageUrl,
-        type: "image"
+        type: (isPexels || isWikimedia) ? "image" : "string"
       }
     ];
   }

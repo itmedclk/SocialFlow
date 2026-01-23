@@ -1,0 +1,72 @@
+curl --location --request POST 'https://openapi.postly.ai/v1/posts' \
+--header 'X-API-KEY: <api-key>' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "text": "string",
+    "media": [
+        {
+            "url": "string",
+            "type": "string"
+        }
+    ],
+    "target_platforms": "string",
+    "workspace": "string",
+    "one_off_schedule": {
+        "one_off_date": "string",
+        "time": "string",
+        "timezone": "string"
+    },
+    "recurring_schedule": {
+        "expression": "string",
+        "start_date": "string",
+        "end_date": "string",
+        "time": "string",
+        "timezone": "string",
+        "week_days": {
+            "num": "string",
+            "value": true
+        },
+        "day_of_month": 0,
+        "rate_value": 0,
+        "rate_unit": "string"
+    },
+    "platform_posts": [
+        {
+            "identifier": "string",
+            "text_override": "string",
+            "media_override": [
+                {
+                    "url": "string",
+                    "type": "string"
+                }
+            ],
+            "settings": {
+                "identifier": "string",
+                "tags": [
+                    "string"
+                ],
+                "language_tags": "string",
+                "one_off_schedule": {
+                    "one_off_date": "string",
+                    "time": "string",
+                    "timezone": "string"
+                },
+                "recurring_schedule": {
+                    "expression": "string",
+                    "start_date": "string",
+                    "end_date": "string",
+                    "time": "string",
+                    "timezone": "string",
+                    "week_days": {
+                        "num": "string",
+                        "value": true
+                    },
+                    "day_of_month": 0,
+                    "rate_value": 0,
+                    "rate_unit": "string"
+                }
+            }
+        }
+    ],
+    "audience_group": "string"
+}'

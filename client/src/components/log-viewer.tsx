@@ -93,7 +93,7 @@ export function LogViewer() {
                   </div>
                   {log.metadata && (
                     <p className="text-slate-500 mt-1 pl-[76px] text-xs font-mono truncate">
-                      {String(formatMetadata(log.metadata))}
+                      {JSON.stringify(log.metadata) as React.ReactNode}
                     </p>
                   )}
                 </div>

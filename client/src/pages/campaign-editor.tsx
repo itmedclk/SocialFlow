@@ -199,15 +199,15 @@ export default function CampaignEditor() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <ImageIcon className="h-5 w-5 text-primary" />
-                  <CardTitle>Image Sources</CardTitle>
+                  <CardTitle>Image Source Override</CardTitle>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label>Configured Image Providers</Label>
+                    <Label>Specific Keyword Overrides</Label>
                     <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs" onClick={addImageSource}>
-                      <Plus className="h-3 w-3" /> Add Source
+                      <Plus className="h-3 w-3" /> Add Keyword
                     </Button>
                   </div>
                   <div className="space-y-2">
@@ -229,7 +229,7 @@ export default function CampaignEditor() {
                           <Input 
                             value={source.value}
                             onChange={(e) => updateImageSource(index, 'value', e.target.value)}
-                            placeholder="Search keywords (e.g. nature, tech)"
+                            placeholder="Force search for specific keywords (e.g. nature)"
                             className="text-sm"
                           />
                         </div>
@@ -242,7 +242,7 @@ export default function CampaignEditor() {
                     ))}
                   </div>
                   <p className="text-[10px] text-muted-foreground mt-2">
-                    The system will attempt to find images from these sources in order of priority.
+                    System will default to dynamic AI search using global sources. Use these overrides only if specific keywords are required for this topic.
                   </p>
                 </div>
               </CardContent>

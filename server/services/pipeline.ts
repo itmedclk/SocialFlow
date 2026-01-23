@@ -73,6 +73,7 @@ export async function processNewPost(post: Post, campaign: Campaign): Promise<vo
       imageUrl: imageUrl || null,
       imageCredit: imageCredit || null,
       status: "draft",
+      aiModel: "deepseek/deepseek-v3.2",
     });
 
   } catch (error) {

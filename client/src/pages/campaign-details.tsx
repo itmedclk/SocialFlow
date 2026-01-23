@@ -112,6 +112,7 @@ export default function CampaignDetails() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Title</TableHead>
+                    <TableHead>AI Model</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>
                       {filter === "scheduled" ? "Scheduled For" : "Date Posted"}
@@ -122,8 +123,11 @@ export default function CampaignDetails() {
                 <TableBody>
                   {filteredPosts.map((post) => (
                     <TableRow key={post.id}>
-                      <TableCell className="font-medium max-w-[400px] truncate">
+                      <TableCell className="font-medium max-w-[300px] truncate">
                         {post.sourceTitle}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {post.aiModel || "N/A"}
                       </TableCell>
                       <TableCell>
                         {post.status === "posted" && (

@@ -793,12 +793,19 @@ export default function Review() {
                   <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
                     Generation Controls
                   </CardTitle>
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] h-5 bg-primary/5 text-primary border-primary/20"
-                  >
-                    Config: {activeCampaign?.topic || "Default"}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {currentPost?.aiModel && (
+                      <Badge variant="secondary" className="text-[10px] h-5 bg-muted/50 text-muted-foreground border-muted">
+                        AI Model: {currentPost.aiModel}
+                      </Badge>
+                    )}
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] h-5 bg-primary/5 text-primary border-primary/20"
+                    >
+                      Config: {activeCampaign?.topic || "Default"}
+                    </Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="grid gap-4 py-4">

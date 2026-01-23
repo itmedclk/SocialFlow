@@ -54,6 +54,7 @@ export const posts = pgTable("posts", {
   postedAt: timestamp("posted_at"),
   retryCount: integer("retry_count").default(0),
   failureReason: text("failure_reason"),
+  aiModel: text("ai_model"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

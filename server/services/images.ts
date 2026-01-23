@@ -33,7 +33,22 @@ export async function searchImage(
 ): Promise<ImageResult | null> {
   const query = keywords.join(" ");
 
-  for (const provider of providers) {
+  // Priority order: pexels -> wikimedia -> unsplash
+  const priority = ["pexels", "wikimedia", "unsplash"];
+  
+  // Create a sorted list based on priority
+  const sortedProviders = [...providers].sort((a, b) => {
+    const aIndex = priority.indexOf(a.type.toLowerCase());
+    const bIndex = priority.indexOf(b.type.toLowerCase());
+    
+    // If provider is in priority list, use its index, otherwise put it at the end
+    const aVal = aIndex === -1 ? 999 : aIndex;
+    const bVal = bIndex === -1 ? 999 : bIndex;
+    
+    return aVal - bVal;
+  });
+
+  for (const provider of sortedProviders) {
     try {
       let result: ImageResult | null = null;
 

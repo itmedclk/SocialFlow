@@ -239,7 +239,8 @@ export default function Review() {
         description: result.message,
       });
 
-      await fetchPosts(activeCampaign.id);
+      const campaignId = activeCampaign?.id;
+      await fetchPosts(campaignId);
     } catch (error) {
       toast({
         title: "Error",
@@ -535,7 +536,7 @@ export default function Review() {
       setPosts((prev) =>
         prev.map((p) =>
           p.id === currentPost.id
-            ? { ...p, generatedCaption: result.post.generatedCaption }
+            ? { ...p, generatedCaption: result.post.generatedCaption, aiModel: result.post.aiModel }
             : p,
         ),
       );

@@ -7,6 +7,34 @@ import { Link } from "wouter";
 import { useEffect, useState } from "react";
 import type { Campaign } from "@shared/schema";
 
+function formatSchedule(cron: string | null): string {
+  if (!cron) return "No schedule set";
+  
+  const parts = cron.split(" ");
+  if (parts.length !== 5) return cron;
+  
+  const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
+  
+  if (hour.startsWith("*/")) {
+    const interval = hour.slice(2);
+    return `Every ${interval} hour${interval === "1" ? "" : "s"}`;
+  }
+  
+  const time = `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+  
+  if (dayOfWeek === "*") {
+    return `Daily at ${time}`;
+  }
+  
+  const dayMap: Record<string, string> = { 
+    "0": "Sun", "1": "Mon", "2": "Tue", "3": "Wed", 
+    "4": "Thu", "5": "Fri", "6": "Sat" 
+  };
+  const days = dayOfWeek.split(",").map(d => dayMap[d] || d).join(", ");
+  
+  return `${days} at ${time}`;
+}
+
 export default function Campaigns() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,7 +136,7 @@ export default function Campaigns() {
                   <div className="space-y-2 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-primary/70" />
-                      <span>{campaign.scheduleCron || "No schedule set"}</span>
+                      <span>{formatSchedule(campaign.scheduleCron)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Globe className="h-4 w-4 text-primary/70" />

@@ -12,6 +12,49 @@ import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation, useParams } from "wouter";
 import type { Campaign } from "@shared/schema";
 
+type ScheduleFrequency = "hourly" | "daily" | "weekly" | "custom";
+
+function cronToSchedule(cron: string): { frequency: ScheduleFrequency; time: string; days: string[] } {
+  if (!cron) return { frequency: "daily", time: "09:00", days: [] };
+  
+  const parts = cron.split(" ");
+  if (parts.length !== 5) return { frequency: "custom", time: "09:00", days: [] };
+  
+  const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
+  
+  if (hour.startsWith("*/")) {
+    return { frequency: "hourly", time: `${hour.slice(2).padStart(2, "0")}:00`, days: [] };
+  }
+  
+  const timeStr = `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+  
+  if (dayOfWeek === "*") {
+    return { frequency: "daily", time: timeStr, days: [] };
+  }
+  
+  const dayMap: Record<string, string> = { "0": "sun", "1": "mon", "2": "tue", "3": "wed", "4": "thu", "5": "fri", "6": "sat" };
+  const days = dayOfWeek.split(",").map(d => dayMap[d] || d);
+  
+  return { frequency: "weekly", time: timeStr, days };
+}
+
+function scheduleToCron(frequency: ScheduleFrequency, time: string, days: string[]): string {
+  const [hour, minute] = time.split(":").map(Number);
+  
+  switch (frequency) {
+    case "hourly":
+      return `0 */${hour || 1} * * *`;
+    case "daily":
+      return `${minute} ${hour} * * *`;
+    case "weekly":
+      const dayMap: Record<string, string> = { "sun": "0", "mon": "1", "tue": "2", "wed": "3", "thu": "4", "fri": "5", "sat": "6" };
+      const dayNums = days.map(d => dayMap[d]).join(",") || "*";
+      return `${minute} ${hour} * * ${dayNums}`;
+    default:
+      return "";
+  }
+}
+
 export default function CampaignEditor() {
   const [location, setLocation] = useLocation();
   const params = useParams();
@@ -20,7 +63,9 @@ export default function CampaignEditor() {
   const [loading, setLoading] = useState(!!campaignId);
   const [name, setName] = useState("");
   const [topic, setTopic] = useState("");
-  const [scheduleCron, setScheduleCron] = useState("");
+  const [scheduleFrequency, setScheduleFrequency] = useState<ScheduleFrequency>("daily");
+  const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [scheduleDays, setScheduleDays] = useState<string[]>([]);
   const [rssUrls, setRssUrls] = useState<string[]>([""]);
   const [imageKeywords, setImageKeywords] = useState<string[]>([]);
   const [imageSources, setImageSources] = useState<{type: string, value: string}[]>([
@@ -48,7 +93,10 @@ export default function CampaignEditor() {
       const campaign: Campaign = await response.json();
       setName(campaign.name);
       setTopic(campaign.topic);
-      setScheduleCron(campaign.scheduleCron || "");
+      const schedule = cronToSchedule(campaign.scheduleCron || "");
+      setScheduleFrequency(schedule.frequency);
+      setScheduleTime(schedule.time);
+      setScheduleDays(schedule.days);
       setRssUrls(campaign.rssUrls && campaign.rssUrls.length > 0 ? campaign.rssUrls : [""]);
       setImageKeywords(campaign.imageKeywords || []);
       setImageSources(campaign.imageProviders && campaign.imageProviders.length > 0 
@@ -123,11 +171,12 @@ export default function CampaignEditor() {
 
     const validRssUrls = rssUrls.filter(url => url.trim() !== "");
     const validImageSources = imageSources.filter(source => source.value.trim() !== "");
+    const cronExpression = scheduleToCron(scheduleFrequency, scheduleTime, scheduleDays);
 
     const campaignData = {
       name: name.trim(),
       topic: topic.trim(),
-      scheduleCron: scheduleCron.trim() || null,
+      scheduleCron: cronExpression || null,
       rssUrls: validRssUrls,
       imageKeywords,
       imageProviders: validImageSources,
@@ -243,22 +292,94 @@ export default function CampaignEditor() {
                   <Clock className="h-5 w-5 text-primary" />
                   <CardTitle>Schedule</CardTitle>
                 </div>
-                <CardDescription>Cron expression for when this campaign should run</CardDescription>
+                <CardDescription>When should this campaign run automatically?</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Cron Expression</Label>
-                  <Input 
-                    value={scheduleCron} 
-                    onChange={(e) => setScheduleCron(e.target.value)}
-                    placeholder="0 9 * * * (Daily at 9:00 AM)"
-                    className="font-mono text-sm"
-                    data-testid="input-schedule-cron"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Examples: "0 9 * * *" (daily 9am), "0 */2 * * *" (every 2 hours)
-                  </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Frequency</Label>
+                    <select 
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      value={scheduleFrequency}
+                      onChange={(e) => setScheduleFrequency(e.target.value as ScheduleFrequency)}
+                      data-testid="select-frequency"
+                    >
+                      <option value="hourly">Every X Hours</option>
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Specific Days</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{scheduleFrequency === "hourly" ? "Every X Hours" : "Run Time"}</Label>
+                    {scheduleFrequency === "hourly" ? (
+                      <select 
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        value={scheduleTime.split(":")[0]}
+                        onChange={(e) => setScheduleTime(`${e.target.value}:00`)}
+                        data-testid="select-hours-interval"
+                      >
+                        <option value="01">Every 1 hour</option>
+                        <option value="02">Every 2 hours</option>
+                        <option value="03">Every 3 hours</option>
+                        <option value="04">Every 4 hours</option>
+                        <option value="06">Every 6 hours</option>
+                        <option value="08">Every 8 hours</option>
+                        <option value="12">Every 12 hours</option>
+                      </select>
+                    ) : (
+                      <Input 
+                        type="time" 
+                        value={scheduleTime}
+                        onChange={(e) => setScheduleTime(e.target.value)}
+                        data-testid="input-time"
+                      />
+                    )}
+                  </div>
                 </div>
+                
+                {scheduleFrequency === "weekly" && (
+                  <div className="space-y-2">
+                    <Label>Run on these days</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { id: "mon", label: "Mon" },
+                        { id: "tue", label: "Tue" },
+                        { id: "wed", label: "Wed" },
+                        { id: "thu", label: "Thu" },
+                        { id: "fri", label: "Fri" },
+                        { id: "sat", label: "Sat" },
+                        { id: "sun", label: "Sun" },
+                      ].map((day) => (
+                        <button
+                          key={day.id}
+                          type="button"
+                          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors border ${
+                            scheduleDays.includes(day.id)
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background hover:bg-muted border-input"
+                          }`}
+                          onClick={() => {
+                            setScheduleDays(prev =>
+                              prev.includes(day.id)
+                                ? prev.filter(d => d !== day.id)
+                                : [...prev, day.id]
+                            );
+                          }}
+                          data-testid={`day-${day.id}`}
+                        >
+                          {day.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <p className="text-xs text-muted-foreground mt-2">
+                  {scheduleFrequency === "hourly" && "Campaign will run at the start of every interval."}
+                  {scheduleFrequency === "daily" && `Campaign will run every day at ${scheduleTime}.`}
+                  {scheduleFrequency === "weekly" && scheduleDays.length > 0 && `Campaign will run on ${scheduleDays.join(", ")} at ${scheduleTime}.`}
+                  {scheduleFrequency === "weekly" && scheduleDays.length === 0 && "Select at least one day for the campaign to run."}
+                </p>
               </CardContent>
             </Card>
 

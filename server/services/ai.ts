@@ -20,11 +20,19 @@ interface ChatCompletionResponse {
   }>;
 }
 
-function getAIConfig(): AIConfig {
-  const baseUrl = process.env.AI_BASE_URL || "https://api.novita.ai/openai";
-  const apiKey = process.env.AI_API_KEY || "";
-  //const model = process.env.AI_MODEL || "deepseek/deepseek-v3.2";
-  const model = "deepseek/deepseek-v3.2";
+async function getAIConfig(userId?: string): Promise<AIConfig> {
+  let baseUrl = process.env.AI_BASE_URL || "https://api.novita.ai/openai";
+  let apiKey = process.env.AI_API_KEY || "";
+  let model = "deepseek/deepseek-v3.2";
+
+  if (userId) {
+    const settings = await storage.getUserSettings(userId);
+    if (settings) {
+      if (settings.aiBaseUrl) baseUrl = settings.aiBaseUrl;
+      if (settings.aiApiKey) apiKey = settings.aiApiKey;
+      if (settings.aiModel) model = settings.aiModel;
+    }
+  }
 
   return { baseUrl, apiKey, model };
 }
@@ -34,7 +42,7 @@ export async function generateCaption(
   campaign: Campaign,
   overridePrompt?: string
 ): Promise<string> {
-  const config = getAIConfig();
+  const config = await getAIConfig(campaign.userId?.toString());
 
   if (!config.apiKey) {
     throw new Error("AI_API_KEY environment variable is not set");

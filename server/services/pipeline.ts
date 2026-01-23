@@ -12,6 +12,9 @@ export async function processNewPost(post: Post, campaign: Campaign): Promise<vo
     let caption: string | null = null;
     let safetyResult: { isValid: boolean; issues: string[] } = { isValid: false, issues: [] };
     
+    const settings = await storage.getUserSettings(campaign.userId?.toString() || "");
+    const modelName = settings?.aiModel || "deepseek/deepseek-v3.2";
+
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       caption = await generateCaption(post, campaign);
       safetyResult = validateContent(caption, safetyConfig);
@@ -73,7 +76,7 @@ export async function processNewPost(post: Post, campaign: Campaign): Promise<vo
       imageUrl: imageUrl || null,
       imageCredit: imageCredit || null,
       status: "draft",
-      aiModel: "deepseek/deepseek-v3.2",
+      aiModel: modelName,
     });
 
   } catch (error) {

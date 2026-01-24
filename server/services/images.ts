@@ -34,8 +34,8 @@ export async function searchImage(
 ): Promise<ImageResult | null> {
   const query = keywords.join(" ");
 
-  // Priority order: pexels -> unsplash -> wikimedia
-  const priority = ["pexels", "unsplash", "wikimedia"];
+  // Priority order: pexels -> unsplash
+  const priority = ["pexels", "unsplash"];
   
   // Create a sorted list based on priority
   const sortedProviders = [...providers].sort((a, b) => {

@@ -47,8 +47,8 @@ export default function Settings() {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState({
     aiApiKey: "",
-    aiBaseUrl: "https://api.novita.ai/v3/openai",
-    aiModel: "deepseek/deepseek-v3-0324",
+    aiBaseUrl: "https://api.novita.ai/openai",
+    aiModel: "deepseek/deepseek-v3.2",
     globalAiPrompt: "You are an expert social media manager. Generate an engaging Instagram caption for the following news article. Include relevant hashtags.",
     postlyApiKey: "",
     postlyWorkspaceId: "",
@@ -75,8 +75,8 @@ export default function Settings() {
     if (settings) {
       setFormData({
         aiApiKey: settings.aiApiKey || "",
-        aiBaseUrl: settings.aiBaseUrl || "https://api.novita.ai/v3/openai",
-        aiModel: settings.aiModel || "deepseek/deepseek-v3-0324",
+        aiBaseUrl: settings.aiBaseUrl || "https://api.novita.ai/openai",
+        aiModel: settings.aiModel || "deepseek/deepseek-v3.2",
         globalAiPrompt: settings.globalAiPrompt || "You are an expert social media manager. Generate an engaging Instagram caption for the following news article. Include relevant hashtags.",
         postlyApiKey: settings.postlyApiKey || "",
         postlyWorkspaceId: settings.postlyWorkspaceId || "",
@@ -251,7 +251,7 @@ export default function Settings() {
                     <Label htmlFor="aiBaseUrl">API Base URL</Label>
                     <Input
                       id="aiBaseUrl"
-                      placeholder="https://api.novita.ai/v3/openai"
+                      placeholder="https://api.novita.ai/openai"
                       value={formData.aiBaseUrl}
                       onChange={(e) =>
                         setFormData((prev) => ({
@@ -267,7 +267,7 @@ export default function Settings() {
                     <Label htmlFor="aiModel">Model Name</Label>
                     <Input
                       id="aiModel"
-                      placeholder="deepseek/deepseek-v3-0324"
+                      placeholder="deepseek/deepseek-v3.2"
                       value={formData.aiModel}
                       onChange={(e) =>
                         setFormData((prev) => ({

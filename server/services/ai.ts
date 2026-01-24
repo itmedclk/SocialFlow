@@ -40,6 +40,9 @@ async function getAIConfig(userId?: string | null): Promise<AIConfig> {
     }
   }
 
+  // If no user settings found, we only use env vars if they exist
+  // This ensures that if AI_API_KEY is removed from secrets, the system fails gracefully
+  // rather than using an embedded or non-existent key.
   return { baseUrl: baseUrlEnv, apiKey: apiKeyEnv, model: modelEnv };
 }
 
@@ -51,7 +54,7 @@ export async function generateCaption(
   const config = await getAIConfig(campaign.userId);
 
   if (!config.apiKey) {
-    throw new Error("AI_API_KEY environment variable is not set");
+    throw new Error("No AI API key found. Please enter your API key in the Settings page.");
   }
 
   const systemPrompt = buildSystemPrompt(campaign);

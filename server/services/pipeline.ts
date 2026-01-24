@@ -12,8 +12,8 @@ export async function processNewPost(post: Post, campaign: Campaign): Promise<vo
     let caption: string | null = null;
     let safetyResult: { isValid: boolean; issues: string[] } = { isValid: false, issues: [] };
     
-    const settings = await storage.getUserSettings(campaign.userId?.toString() || "");
-    const modelName = settings?.aiModel || "deepseek/deepseek-v3.2";
+    const settings = campaign.userId ? await storage.getUserSettings(campaign.userId) : undefined;
+    const modelName = settings?.aiModel || process.env.AI_MODEL || "deepseek/deepseek-v3.2";
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       caption = await generateCaption(post, campaign);

@@ -26,13 +26,17 @@ async function getAIConfig(userId?: string | null): Promise<AIConfig> {
   const modelEnv = process.env.AI_MODEL || "deepseek/deepseek-v3.2";
 
   if (userId) {
-    const settings = await storage.getUserSettings(userId);
-    if (settings) {
-      return {
-        baseUrl: settings.aiBaseUrl || baseUrlEnv,
-        apiKey: settings.aiApiKey || apiKeyEnv,
-        model: settings.aiModel || modelEnv
-      };
+    try {
+      const settings = await storage.getUserSettings(userId);
+      if (settings) {
+        return {
+          baseUrl: settings.aiBaseUrl || baseUrlEnv,
+          apiKey: settings.aiApiKey || apiKeyEnv,
+          model: settings.aiModel || modelEnv
+        };
+      }
+    } catch (error) {
+      console.error(`[AI] Error fetching settings for user ${userId}:`, error);
     }
   }
 

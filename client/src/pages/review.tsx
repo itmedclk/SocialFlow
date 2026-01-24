@@ -921,9 +921,9 @@ export default function Review() {
                   <div className="flex-1 bg-muted/30 relative group flex items-center justify-center min-h-[200px]">
                     {currentPost?.imageUrl ? (
                       <img
-                        src={currentPost.imageUrl}
+                        src={currentPost.imageUrl.replace(/&amp;/g, '&')}
                         alt="Preview"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';
                         }}

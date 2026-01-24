@@ -60,11 +60,8 @@ export async function searchImage(
         case "pexels":
           result = await searchPexels(query, offset);
           break;
-        case "wikimedia":
-          result = await searchWikimedia(query, offset);
-          break;
         default:
-          console.warn(`Unknown image provider: ${provider.type}`);
+          console.warn(`Unknown or disabled image provider: ${provider.type}`);
       }
 
       if (result) {

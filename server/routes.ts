@@ -677,8 +677,8 @@ export async function registerRoutes(
 
       if (!imageUrl) {
         const providers = campaign.imageProviders?.length 
-          ? campaign.imageProviders 
-          : [{ type: "wikimedia", value: "" }];
+          ? campaign.imageProviders.filter((p: any) => p.type.toLowerCase() !== "wikimedia")
+          : [{ type: "pexels", value: "" }, { type: "unsplash", value: "" }];
         
         const keywords = getImageKeywordsFromCampaign(campaign, post.sourceTitle);
         // Pass offset to searchImage

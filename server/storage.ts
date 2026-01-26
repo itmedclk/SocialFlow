@@ -209,31 +209,27 @@ export class DatabaseStorage implements IStorage {
           .select()
           .from(posts)
           .where(and(eq(posts.campaignId, campaignId), eq(posts.status, draftStatus), eq(posts.userId, userId)))
-          .orderBy(desc(posts.pubDate), desc(posts.createdAt))
-          .limit(30);
+          .orderBy(desc(posts.pubDate), desc(posts.createdAt));
       }
       return await db
         .select()
         .from(posts)
         .where(and(eq(posts.status, draftStatus), eq(posts.userId, userId)))
-        .orderBy(desc(posts.pubDate), desc(posts.createdAt))
-        .limit(30);
+        .orderBy(desc(posts.pubDate), desc(posts.createdAt));
     }
     if (campaignId !== undefined) {
       return await db
         .select()
         .from(posts)
         .where(and(eq(posts.campaignId, campaignId), eq(posts.status, draftStatus)))
-        .orderBy(desc(posts.pubDate), desc(posts.createdAt))
-        .limit(30);
+        .orderBy(desc(posts.pubDate), desc(posts.createdAt));
     }
     
     return await db
       .select()
       .from(posts)
       .where(eq(posts.status, draftStatus))
-      .orderBy(desc(posts.pubDate), desc(posts.createdAt))
-      .limit(30);
+      .orderBy(desc(posts.pubDate), desc(posts.createdAt));
   }
 
   // ============================================

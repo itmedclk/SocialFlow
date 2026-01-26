@@ -26,7 +26,7 @@ import {
   X,
   ExternalLink,
   Sparkles,
-  Image as ImageIcon,
+  ImageIcon,
   MessageSquare,
   Save,
   Wand2,

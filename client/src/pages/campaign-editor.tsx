@@ -72,7 +72,8 @@ export default function CampaignEditor() {
     { type: "unsplash", value: "" }
   ]);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
-  const [accountIds, setAccountIds] = useState<string[]>([""]);
+  const [useSpecificAccount, setUseSpecificAccount] = useState(false);
+  const [specificAccountId, setSpecificAccountId] = useState("");
   const [aiPrompt, setAiPrompt] = useState("");
   const [safetyForbiddenTerms, setSafetyForbiddenTerms] = useState("");
   const [safetyMaxLength, setSafetyMaxLength] = useState(2000);
@@ -104,7 +105,8 @@ export default function CampaignEditor() {
         ? campaign.imageProviders 
         : [{ type: "unsplash", value: "" }]);
       setSelectedPlatforms(campaign.targetPlatforms || []);
-      setAccountIds(campaign.accountIds && campaign.accountIds.length > 0 ? campaign.accountIds : [""]);
+      setUseSpecificAccount(campaign.useSpecificAccount ?? false);
+      setSpecificAccountId(campaign.specificAccountId || "");
       setAiPrompt(campaign.aiPrompt || "");
       setSafetyForbiddenTerms(campaign.safetyForbiddenTerms || "");
       setSafetyMaxLength(campaign.safetyMaxLength || 2000);
@@ -153,22 +155,6 @@ export default function CampaignEditor() {
     setImageSources(newSources);
   };
 
-  const addAccountId = () => {
-    setAccountIds([...accountIds, ""]);
-  };
-
-  const removeAccountId = (index: number) => {
-    const newIds = [...accountIds];
-    newIds.splice(index, 1);
-    setAccountIds(newIds.length > 0 ? newIds : [""]);
-  };
-
-  const updateAccountId = (index: number, value: string) => {
-    const newIds = [...accountIds];
-    newIds[index] = value;
-    setAccountIds(newIds);
-  };
-
   const togglePlatform = (platform: string) => {
     setSelectedPlatforms(prev => 
       prev.includes(platform) 
@@ -191,8 +177,6 @@ export default function CampaignEditor() {
     const validImageSources = imageSources.filter(source => source.value.trim() !== "");
     const cronExpression = scheduleToCron(scheduleFrequency, scheduleTime, scheduleDays);
 
-    const validAccountIds = accountIds.filter(id => id.trim() !== "");
-
     const campaignData = {
       name: name.trim(),
       topic: topic.trim(),
@@ -201,7 +185,8 @@ export default function CampaignEditor() {
       imageKeywords,
       imageProviders: validImageSources,
       targetPlatforms: selectedPlatforms,
-      accountIds: validAccountIds,
+      useSpecificAccount,
+      specificAccountId: useSpecificAccount ? specificAccountId.trim() || null : null,
       aiPrompt: aiPrompt.trim() || null,
       safetyForbiddenTerms: safetyForbiddenTerms.trim() || null,
       safetyMaxLength,
@@ -524,64 +509,49 @@ export default function CampaignEditor() {
               </CardContent>
             </Card>
 
-            {/* Account IDs */}
+            {/* Account Targeting */}
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <User className="h-5 w-5 text-primary" />
-                  <CardTitle>Social Media Accounts</CardTitle>
+                  <CardTitle>Account Targeting</CardTitle>
                 </div>
                 <CardDescription>
-                  Enter the account IDs to publish to. The first one is the default.
+                  Choose where to publish posts from this campaign.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Account IDs</Label>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-6 gap-1 text-xs" 
-                      onClick={addAccountId}
-                      data-testid="button-add-account"
-                    >
-                      <Plus className="h-3 w-3" /> Add Account
-                    </Button>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="cursor-pointer">Post to specific account</Label>
+                    <p className="text-[11px] text-muted-foreground">
+                      {useSpecificAccount 
+                        ? "Posts will go to a specific account ID" 
+                        : "Posts will go to all accounts in the channel"}
+                    </p>
                   </div>
-                  <div className="space-y-2">
-                    {accountIds.map((id, index) => (
-                      <div key={index} className="flex gap-2">
-                        <div className="relative flex-1">
-                          <span className="absolute left-3 top-2.5 text-xs font-mono text-muted-foreground">
-                            {index === 0 ? "Default" : `#${index + 1}`}
-                          </span>
-                          <Input 
-                            value={id}
-                            onChange={(e) => updateAccountId(index, e.target.value)}
-                            className="font-mono text-xs pl-16"
-                            placeholder="Enter account ID"
-                            data-testid={`input-account-id-${index}`}
-                          />
-                        </div>
-                        {accountIds.length > 1 && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-muted-foreground hover:text-destructive" 
-                            onClick={() => removeAccountId(index)}
-                            data-testid={`button-remove-account-${index}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground mt-2">
-                    These are the social media account IDs where posts will be published. Get your account IDs from your Postly dashboard.
-                  </p>
+                  <Switch 
+                    checked={useSpecificAccount} 
+                    onCheckedChange={setUseSpecificAccount}
+                    data-testid="switch-use-specific-account"
+                  />
                 </div>
+                
+                {useSpecificAccount && (
+                  <div className="space-y-2 pt-2 border-t">
+                    <Label>Specific Account ID</Label>
+                    <Input 
+                      value={specificAccountId}
+                      onChange={(e) => setSpecificAccountId(e.target.value)}
+                      className="font-mono text-sm"
+                      placeholder="Enter the account ID"
+                      data-testid="input-specific-account-id"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Get your account ID from your Postly dashboard.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

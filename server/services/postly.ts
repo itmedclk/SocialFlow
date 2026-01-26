@@ -1,12 +1,6 @@
 import { storage } from "../storage";
 import type { Post, Campaign } from "@shared/schema";
 
-interface PostlyConfig {
-  apiKey: string;
-  baseUrl: string;
-  workspaceId: string;
-}
-
 interface PostlyPublishPayload {
   text: string;
   media?: Array<{
@@ -29,14 +23,6 @@ interface PostlyResponse {
   error?: string;
 }
 
-function getPostlyConfig(): PostlyConfig {
-  const apiKey = process.env.POSTLY_API_KEY || "";
-  const baseUrl = process.env.POSTLY_BASE_URL || "https://openapi.postly.ai/v1";
-  const workspaceId = process.env.POSTLY_WORKSPACE_ID || "";
-
-  return { apiKey, baseUrl, workspaceId };
-}
-
 export async function publishToPostly(
   post: Post,
   campaign: Campaign,
@@ -44,14 +30,14 @@ export async function publishToPostly(
   userWorkspaceId?: string | null,
   captionOverride?: string | null
 ): Promise<{ success: boolean; error?: string }> {
-  const config = getPostlyConfig();
-  const apiKey = userApiKey || config.apiKey;
-  const workspaceId = userWorkspaceId || config.workspaceId;
+  const apiKey = userApiKey;
+  const workspaceId = userWorkspaceId;
 
   if (!apiKey) {
-    throw new Error("Postly API key not configured. Please set it in settings.");
+    throw new Error("Postly API key not configured for this user. Please set it in settings.");
   }
 
+  const baseUrl = "https://openapi.postly.ai/v1";
   const platforms = campaign.targetPlatforms || [];
   
   const payload: PostlyPublishPayload = {
@@ -61,7 +47,7 @@ export async function publishToPostly(
   };
 
   if (post.imageUrl) {
-    let mimeType = "image/jpeg"; // Default
+    let mimeType = "image/jpeg";
     const lowerUrl = post.imageUrl.toLowerCase();
     
     if (lowerUrl.endsWith(".png")) mimeType = "image/png";
@@ -79,7 +65,7 @@ export async function publishToPostly(
   }
 
   try {
-    const response = await fetch(`${config.baseUrl}/posts`, {
+    const response = await fetch(`${baseUrl}/posts`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -95,7 +81,6 @@ export async function publishToPostly(
 
     const data: PostlyResponse = await response.json();
 
-    // The API might return success in a different format, checking based on common patterns
     if (data.error) {
       throw new Error(data.error || "Postly returned unsuccessful response");
     }
@@ -103,6 +88,7 @@ export async function publishToPostly(
     await storage.createLog({
       campaignId: campaign.id,
       postId: post.id,
+      userId: campaign.userId,
       level: "info",
       message: `Post published successfully to ${platforms.join(", ")}`,
       metadata: { postlyId: data.post_id, platforms },
@@ -115,6 +101,7 @@ export async function publishToPostly(
     await storage.createLog({
       campaignId: campaign.id,
       postId: post.id,
+      userId: campaign.userId,
       level: "error",
       message: `Failed to publish to Postly: ${errorMessage}`,
       metadata: { platforms },
@@ -124,17 +111,15 @@ export async function publishToPostly(
   }
 }
 
-export async function getSocialAccounts(): Promise<Array<{ id: string; platform: string; name: string }>> {
-  const config = getPostlyConfig();
-
-  if (!config.apiKey) {
+export async function getSocialAccounts(apiKey: string): Promise<Array<{ id: string; platform: string; name: string }>> {
+  if (!apiKey) {
     return [];
   }
 
   try {
-    const response = await fetch(`${config.baseUrl}/accounts`, {
+    const response = await fetch("https://openapi.postly.ai/v1/accounts", {
       headers: {
-        Authorization: `Bearer ${config.apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
     });
 

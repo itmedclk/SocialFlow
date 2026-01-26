@@ -41,7 +41,8 @@ export async function publishToPostly(
   post: Post,
   campaign: Campaign,
   userApiKey?: string | null,
-  userWorkspaceId?: string | null
+  userWorkspaceId?: string | null,
+  captionOverride?: string | null
 ): Promise<{ success: boolean; error?: string }> {
   const config = getPostlyConfig();
   const apiKey = userApiKey || config.apiKey;
@@ -54,7 +55,7 @@ export async function publishToPostly(
   const platforms = campaign.targetPlatforms || [];
   
   const payload: PostlyPublishPayload = {
-    text: post.generatedCaption || "",
+    text: captionOverride || post.generatedCaption || "",
     target_platforms: platforms.join(","),
     workspace: workspaceId || undefined,
   };

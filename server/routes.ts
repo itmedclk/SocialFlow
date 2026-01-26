@@ -394,7 +394,9 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Campaign not found" });
       }
 
-      await publishPost(post, campaign);
+      const captionOverride = req.body.generatedCaption;
+
+      await publishPost(post, campaign, captionOverride);
       const updatedPost = await storage.getPost(id);
 
       res.json({

@@ -99,8 +99,8 @@ export async function processNewPost(post: Post, campaign: Campaign): Promise<vo
   }
 }
 
-export async function publishPost(post: Post, campaign: Campaign): Promise<void> {
-  if (!post.generatedCaption) {
+export async function publishPost(post: Post, campaign: Campaign, captionOverride?: string | null): Promise<void> {
+  if (!post.generatedCaption && !captionOverride) {
     throw new Error("Post has no caption to publish");
   }
 
@@ -115,7 +115,7 @@ export async function publishPost(post: Post, campaign: Campaign): Promise<void>
   while (attempts < MAX_RETRIES) {
     attempts++;
 
-    const result = await publishToPostly(post, campaign, postlyApiKey, postlyWorkspaceId);
+    const result = await publishToPostly(post, campaign, postlyApiKey, postlyWorkspaceId, captionOverride);
 
     if (result.success) {
       await storage.updatePost(post.id, {

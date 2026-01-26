@@ -287,7 +287,8 @@ export async function registerRoutes(
 
   app.post("/api/logs", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertLogSchema.parse(req.body);
+      const userId = req.user.claims.sub;
+      const validatedData = insertLogSchema.parse({ ...req.body, userId });
       const log = await storage.createLog(validatedData);
       res.status(201).json(log);
     } catch (error) {

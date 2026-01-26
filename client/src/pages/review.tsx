@@ -113,6 +113,18 @@ export default function Review() {
     setPromptModified(false);
   }, [selectedCampaign, campaigns, globalSettings]);
 
+  // Sync prompt when current post changes if it's from a different campaign
+  useEffect(() => {
+    if (currentPost && selectedCampaign === "all") {
+      const postCampaign = campaigns.find(c => c.id === currentPost.campaignId);
+      if (postCampaign?.aiPrompt) {
+        setPrompt(postCampaign.aiPrompt);
+      } else if (globalSettings?.globalAiPrompt) {
+        setPrompt(globalSettings.globalAiPrompt);
+      }
+    }
+  }, [currentPost, selectedCampaign, campaigns, globalSettings]);
+
   const fetchGlobalSettings = async () => {
     try {
       const response = await fetch("/api/settings", { credentials: "include" });

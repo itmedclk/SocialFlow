@@ -1,7 +1,29 @@
 import Parser from "rss-parser";
 import { storage } from "../storage";
 import { Campaign, campaigns, type InsertPost } from "@shared/schema";
+import { processNewPost } from "./pipeline";
 
+function getNextScheduledTime(campaign: Campaign): Date | null {
+  if (!campaign.scheduleCron) return null;
+
+  const parts = campaign.scheduleCron.split(" ");
+  if (parts.length < 2) return null;
+  
+  const minute = parseInt(parts[0], 10);
+  const hour = parseInt(parts[1], 10);
+  
+  if (isNaN(minute) || isNaN(hour)) return null;
+
+  const now = new Date();
+  const next = new Date();
+  next.setHours(hour, minute, 0, 0);
+
+  if (next <= now) {
+    next.setDate(next.getDate() + 1);
+  }
+
+  return next;
+}
 
 const parser = new Parser({
   timeout: 10000,
@@ -112,8 +134,33 @@ export async function processCampaignFeeds(campaignId: number, userId?: string):
             status: "draft",
           };
 
-          await storage.createPost(postData);
+          const newPost = await storage.createPost(postData);
           result.new++;
+
+          // If autoPublish is enabled, process and schedule the post automatically
+          if (campaign.autoPublish && newPost) {
+            try {
+              await processNewPost(newPost, campaign);
+              
+              // Calculate next scheduled time based on campaign cron
+              const scheduledFor = getNextScheduledTime(campaign);
+              
+              await storage.updatePost(newPost.id, {
+                status: "scheduled",
+                scheduledFor,
+              });
+
+              await storage.createLog({
+                campaignId,
+                postId: newPost.id,
+                userId: userId || campaign.userId,
+                level: "info",
+                message: `Post auto-processed and scheduled for ${scheduledFor?.toISOString() || "next available slot"}`,
+              });
+            } catch (error) {
+              console.error(`[RSS] Auto-process failed for post ${newPost.id}:`, error);
+            }
+          }
         }
       }
     } catch (error) {

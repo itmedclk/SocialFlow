@@ -25,35 +25,44 @@ interface ChatCompletionResponse {
 }
 
 async function getAIConfig(userId?: string | null): Promise<AIConfig> {
-  const baseUrlEnv = process.env.AI_BASE_URL || "https://api.novita.ai/openai";
+  const baseUrlEnv =
+    process.env.AI_BASE_URL || "https://api.novita.ai/openai/chat/completions";
   const apiKeyEnv = process.env.AI_API_KEY || "";
-  const modelEnv = process.env.AI_MODEL || "deepseek/deepseek-v3.2";
+  const modelEnv = process.env.AI_MODEL || "openai/gpt-oss-20b";
 
   console.log(`[AI] Getting config for user identifier: "${userId}"`);
 
   let targetUserId = userId;
-  
+
   if (!targetUserId) {
     const allSettings = await db.select().from(userSettings).limit(1);
     if (allSettings.length > 0) {
       targetUserId = allSettings[0].userId;
-      console.log(`[AI] No userId provided, using first found user: "${targetUserId}"`);
+      console.log(
+        `[AI] No userId provided, using first found user: "${targetUserId}"`,
+      );
     }
   }
 
   if (targetUserId) {
     try {
       const settings = await storage.getUserSettings(targetUserId.toString());
-      console.log(`[AI] Found settings for user ${targetUserId}:`, settings ? "Yes" : "No");
+      console.log(
+        `[AI] Found settings for user ${targetUserId}:`,
+        settings ? "Yes" : "No",
+      );
       if (settings && settings.aiApiKey) {
         return {
           baseUrl: settings.aiBaseUrl || baseUrlEnv,
           apiKey: settings.aiApiKey,
-          model: settings.aiModel || modelEnv
+          model: settings.aiModel || modelEnv,
         };
       }
     } catch (error) {
-      console.error(`[AI] Error fetching settings for user ${targetUserId}:`, error);
+      console.error(
+        `[AI] Error fetching settings for user ${targetUserId}:`,
+        error,
+      );
     }
   }
 
@@ -64,18 +73,21 @@ async function fetchFullContent(url: string): Promise<string | null> {
   try {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      },
     });
-    
+
     if (!response.ok) return null;
-    
+
     const html = await response.text();
     const dom = new JSDOM(html, { url });
     const reader = new Readability(dom.window.document);
     const article = reader.parse();
-    
-    return article?.textContent ? article.textContent.trim().substring(0, 10000) : null;
+
+    return article?.textContent
+      ? article.textContent.trim().substring(0, 10000)
+      : null;
   } catch (error) {
     console.error(`[AI] Error fetching full content from ${url}:`, error);
     return null;
@@ -85,17 +97,19 @@ async function fetchFullContent(url: string): Promise<string | null> {
 export async function generateCaption(
   post: Post,
   campaign: Campaign,
-  overridePrompt?: string
+  overridePrompt?: string,
 ): Promise<string> {
   const config = await getAIConfig(campaign.userId);
 
   if (!config.apiKey) {
-    throw new Error("No AI API key found. Please enter your API key in the Settings page.");
+    throw new Error(
+      "No AI API key found. Please enter your API key in the Settings page.",
+    );
   }
 
   // Fetch full content if possible
   const fullContent = await fetchFullContent(post.sourceUrl);
-  
+
   const systemPrompt = buildSystemPrompt(campaign, overridePrompt);
   const userPrompt = buildUserPrompt(post, fullContent);
 
@@ -162,7 +176,10 @@ export async function generateCaption(
   }
 }
 
-function buildSystemPrompt(campaign: Campaign, overridePrompt?: string): string {
+function buildSystemPrompt(
+  campaign: Campaign,
+  overridePrompt?: string,
+): string {
   const defaultPrompt = `You are a social media content creator. Create engaging, concise social media posts based on the article provided. 
 Keep the tone professional yet approachable. Include relevant hashtags. 
 The post should be compelling and encourage engagement.
@@ -226,7 +243,7 @@ export function validateContent(
 
   for (const term of config.forbiddenTerms) {
     if (term && term.length > 2) {
-      const regex = new RegExp(`\\b${term}\\b`, 'i');
+      const regex = new RegExp(`\\b${term}\\b`, "i");
       if (regex.test(caption)) {
         issues.push(`Contains forbidden term: "${term}"`);
       }

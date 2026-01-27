@@ -20,6 +20,7 @@ export const campaigns = pgTable("campaigns", {
   targetPlatforms: jsonb("target_platforms").$type<string[]>().default(sql`'[]'::jsonb`),
   useSpecificAccount: boolean("use_specific_account").default(false),
   specificAccountId: text("specific_account_id"),
+  autoPublish: boolean("auto_publish").default(false),
   userId: text("user_id"),
   safetyForbiddenTerms: text("safety_forbidden_terms"),
   safetyMaxLength: integer("safety_max_length").default(2000),

@@ -49,7 +49,8 @@ export default function Settings() {
     aiApiKey: "",
     aiBaseUrl: "https://api.novita.ai/openai",
     aiModel: "deepseek/deepseek-v3.2",
-    globalAiPrompt: "You are an expert social media manager. Generate an engaging Instagram caption for the following news article. Include relevant hashtags.",
+    globalAiPrompt:
+      "You are an expert social media manager. Generate an engaging Instagram caption for the following news article. Include relevant hashtags.",
     postlyApiKey: "",
     postlyWorkspaceId: "",
     unsplashAccessKey: "",
@@ -76,8 +77,10 @@ export default function Settings() {
       setFormData({
         aiApiKey: settings.aiApiKey || "",
         aiBaseUrl: settings.aiBaseUrl || "https://api.novita.ai/openai",
-        aiModel: settings.aiModel || "deepseek/deepseek-v3.2",
-        globalAiPrompt: settings.globalAiPrompt || "You are an expert social media manager. Generate an engaging Instagram caption for the following news article. Include relevant hashtags.",
+        aiModel: settings.aiModel || "openai/gpt-oss-120b",
+        globalAiPrompt:
+          settings.globalAiPrompt ||
+          "You are an expert social media manager. Generate an engaging Instagram caption for the following news article. Include relevant hashtags.",
         postlyApiKey: settings.postlyApiKey || "",
         postlyWorkspaceId: settings.postlyWorkspaceId || "",
         unsplashAccessKey: settings.unsplashAccessKey || "",
@@ -130,7 +133,6 @@ export default function Settings() {
   const toggleShowKey = (key: string) => {
     setShowKeys((prev) => ({ ...prev, [key]: !prev[key] }));
   };
-
 
   const handleSave = () => {
     saveMutation.mutate(formData);
@@ -317,7 +319,9 @@ export default function Settings() {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="globalAiPrompt">Default AI Prompt (Global)</Label>
+                  <Label htmlFor="globalAiPrompt">
+                    Default AI Prompt (Global)
+                  </Label>
                   <textarea
                     id="globalAiPrompt"
                     className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -332,7 +336,8 @@ export default function Settings() {
                     data-testid="input-global-ai-prompt"
                   />
                   <p className="text-xs text-muted-foreground">
-                    This is used as a fallback when a campaign doesn't have its own prompt.
+                    This is used as a fallback when a campaign doesn't have its
+                    own prompt.
                   </p>
                 </div>
               </CardContent>
@@ -345,7 +350,8 @@ export default function Settings() {
                   <CardTitle>Postly Publishing</CardTitle>
                 </div>
                 <CardDescription>
-                  Your Postly API key and Workspace ID for publishing to social media platforms.
+                  Your Postly API key and Workspace ID for publishing to social
+                  media platforms.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

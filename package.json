@@ -14,6 +14,7 @@
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
+    "@mozilla/readability": "^0.6.0",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-aspect-ratio": "^1.1.8",
@@ -42,6 +43,7 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tanstack/react-query": "^5.60.5",
+    "@types/jsdom": "^27.0.0",
     "@types/memoizee": "^0.4.12",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -55,6 +57,7 @@
     "express-session": "^1.19.0",
     "framer-motion": "^12.23.24",
     "input-otp": "^1.4.2",
+    "jsdom": "^27.4.0",
     "lucide-react": "^0.545.0",
     "memoizee": "^0.4.17",
     "memorystore": "^1.6.7",

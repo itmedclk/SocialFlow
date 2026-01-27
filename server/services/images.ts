@@ -1,5 +1,5 @@
 import { storage } from "../storage";
-import type { Campaign } from "@shared/schema";
+import { userSettings, type Campaign } from "@shared/schema";
 
 export interface ImageResult {
   url: string;
@@ -30,22 +30,22 @@ export async function searchImage(
   keywords: string[],
   providers: Array<{ type: string; value: string }>,
   campaignId?: number,
-  offset: number = 0
+  offset: number = 0,
 ): Promise<ImageResult | null> {
   const query = keywords.join(" ");
 
   // Priority order: pexels -> unsplash
   const priority = ["pexels", "unsplash"];
-  
+
   // Create a sorted list based on priority
   const sortedProviders = [...providers].sort((a, b) => {
     const aIndex = priority.indexOf(a.type.toLowerCase());
     const bIndex = priority.indexOf(b.type.toLowerCase());
-    
+
     // If provider is in priority list, use its index, otherwise put it at the end
     const aVal = aIndex === -1 ? 999 : aIndex;
     const bVal = bIndex === -1 ? 999 : bIndex;
-    
+
     return aVal - bVal;
   });
 
@@ -76,9 +76,10 @@ export async function searchImage(
         return result;
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       console.error(`Image search failed for ${provider.type}:`, errorMessage);
-      
+
       if (campaignId) {
         await storage.createLog({
           campaignId,
@@ -93,9 +94,12 @@ export async function searchImage(
   return null;
 }
 
-async function searchUnsplash(query: string, offset: number = 0): Promise<ImageResult | null> {
+async function searchUnsplash(
+  query: string,
+  offset: number = 0,
+): Promise<ImageResult | null> {
   const apiKey = process.env.UNSPLASH_ACCESS_KEY;
-  
+
   if (!apiKey) {
     throw new Error("UNSPLASH_ACCESS_KEY not configured");
   }
@@ -103,7 +107,7 @@ async function searchUnsplash(query: string, offset: number = 0): Promise<ImageR
   const perPage = 1;
   const page = offset + 1;
   const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}&orientation=landscape`;
-  
+
   const response = await fetch(url, {
     headers: {
       Authorization: `Client-ID ${apiKey}`,
@@ -128,9 +132,12 @@ async function searchUnsplash(query: string, offset: number = 0): Promise<ImageR
   };
 }
 
-async function searchPexels(query: string, offset: number = 0): Promise<ImageResult | null> {
+async function searchPexels(
+  query: string,
+  offset: number = 0,
+): Promise<ImageResult | null> {
   const apiKey = process.env.PEXELS_API_KEY;
-  
+
   if (!apiKey) {
     throw new Error("PEXELS_API_KEY not configured");
   }
@@ -138,7 +145,7 @@ async function searchPexels(query: string, offset: number = 0): Promise<ImageRes
   const perPage = 1;
   const page = offset + 1;
   const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}&orientation=landscape`;
-  
+
   const response = await fetch(url, {
     headers: {
       Authorization: apiKey,
@@ -163,9 +170,12 @@ async function searchPexels(query: string, offset: number = 0): Promise<ImageRes
   };
 }
 
-async function searchWikimedia(query: string, offset: number = 0): Promise<ImageResult | null> {
+async function searchWikimedia(
+  query: string,
+  offset: number = 0,
+): Promise<ImageResult | null> {
   const url = `https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srnamespace=6&srlimit=1&sroffset=${offset}&format=json&origin=*`;
-  
+
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -181,7 +191,7 @@ async function searchWikimedia(query: string, offset: number = 0): Promise<Image
 
   const title = result.title;
   const imageInfoUrl = `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=imageinfo&iiprop=url&format=json&origin=*`;
-  
+
   const imageInfoResponse = await fetch(imageInfoUrl);
   const imageInfoData = await imageInfoResponse.json();
   const pages = imageInfoData.query?.pages;
@@ -213,14 +223,23 @@ export async function extractOgImage(url: string): Promise<string | null> {
     }
 
     const html = await response.text();
-    
-    const ogMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
-                    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+
+    const ogMatch =
+      html.match(
+        /<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i,
+      ) ||
+      html.match(
+        /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i,
+      );
 
     const ogImage = ogMatch ? ogMatch[1] : null;
 
     // Skip low-quality thumbnails or restricted Google News images
-    if (ogImage && (ogImage.includes('googleusercontent.com') || ogImage.includes('news.google.com'))) {
+    if (
+      ogImage &&
+      (ogImage.includes("googleusercontent.com") ||
+        ogImage.includes("news.google.com"))
+    ) {
       return null;
     }
 
@@ -231,9 +250,12 @@ export async function extractOgImage(url: string): Promise<string | null> {
   }
 }
 
-export function getImageKeywordsFromCampaign(campaign: Campaign, articleTitle: string): string[] {
+export function getImageKeywordsFromCampaign(
+  campaign: Campaign,
+  articleTitle: string,
+): string[] {
   const configuredKeywords = campaign.imageKeywords || [];
-  
+
   const titleWords = articleTitle
     .toLowerCase()
     .replace(/[^\w\s]/g, "")

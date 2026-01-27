@@ -28,31 +28,44 @@ export async function publishToPostly(
   campaign: Campaign,
   userApiKey?: string | null,
   userWorkspaceId?: string | null,
-  captionOverride?: string | null
+  captionOverride?: string | null,
 ): Promise<{ success: boolean; error?: string }> {
   const apiKey = userApiKey;
   const workspaceId = userWorkspaceId;
 
   if (!apiKey) {
-    throw new Error("Postly API key not configured for this user. Please set it in settings.");
+    throw new Error(
+      "Postly API key not configured for this user. Please set it in settings.",
+    );
   }
 
   const baseUrl = "https://openapi.postly.ai/v1";
   const platforms = campaign.targetPlatforms || [];
 
-  
+  let targetPlatforms: string | undefined;
 
-  
+  // if accountid is set, use it
+  if (campaign.useSpecificAccount && campaign.specificAccountId) {
+    targetPlatforms = campaign.specificAccountId;
+    console.warn(
+      "useSpecificAccount is true but specificAccountId" +
+        campaign.specificAccountId,
+    );
+  } else {
+    targetPlatforms = platforms.join(",");
+  }
+
   const payload: PostlyPublishPayload = {
     text: captionOverride || post.generatedCaption || "",
-    target_platforms: platforms.join(","),
+    //target_platforms: platforms.join(","),
+    target_platforms: targetPlatforms,
     workspace: workspaceId || undefined,
   };
 
   if (post.imageUrl) {
     let mimeType = "image/jpeg";
     const lowerUrl = post.imageUrl.toLowerCase();
-    
+
     if (lowerUrl.endsWith(".png")) mimeType = "image/png";
     else if (lowerUrl.endsWith(".gif")) mimeType = "image/gif";
     else if (lowerUrl.endsWith(".webp")) mimeType = "image/webp";
@@ -62,8 +75,8 @@ export async function publishToPostly(
     payload.media = [
       {
         url: post.imageUrl,
-        type: mimeType
-      }
+        type: mimeType,
+      },
     ];
   }
 
@@ -114,7 +127,9 @@ export async function publishToPostly(
   }
 }
 
-export async function getSocialAccounts(apiKey: string): Promise<Array<{ id: string; platform: string; name: string }>> {
+export async function getSocialAccounts(
+  apiKey: string,
+): Promise<Array<{ id: string; platform: string; name: string }>> {
   if (!apiKey) {
     return [];
   }

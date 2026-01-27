@@ -1,6 +1,7 @@
 import Parser from "rss-parser";
 import { storage } from "../storage";
-import type { InsertPost } from "@shared/schema";
+import { Campaign, campaigns, type InsertPost } from "@shared/schema";
+
 
 const parser = new Parser({
   timeout: 10000,
@@ -135,3 +136,5 @@ export async function processAllActiveCampaigns(userId?: string): Promise<void> 
     }
   }
 }
+
+

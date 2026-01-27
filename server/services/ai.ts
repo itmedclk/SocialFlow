@@ -2,6 +2,8 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { userSettings } from "@shared/schema";
 import type { Post, Campaign } from "@shared/schema";
+import { Readability } from "@mozilla/readability";
+import { JSDOM } from "jsdom";
 
 interface AIConfig {
   baseUrl: string;
@@ -29,7 +31,6 @@ async function getAIConfig(userId?: string | null): Promise<AIConfig> {
 
   console.log(`[AI] Getting config for user identifier: "${userId}"`);
 
-  // Try to find ANY user settings if the provided userId is missing
   let targetUserId = userId;
   
   if (!targetUserId) {
@@ -59,6 +60,28 @@ async function getAIConfig(userId?: string | null): Promise<AIConfig> {
   return { baseUrl: baseUrlEnv, apiKey: apiKeyEnv, model: modelEnv };
 }
 
+async function fetchFullContent(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+    
+    if (!response.ok) return null;
+    
+    const html = await response.text();
+    const dom = new JSDOM(html, { url });
+    const reader = new Readability(dom.window.document);
+    const article = reader.parse();
+    
+    return article?.textContent ? article.textContent.trim().substring(0, 10000) : null;
+  } catch (error) {
+    console.error(`[AI] Error fetching full content from ${url}:`, error);
+    return null;
+  }
+}
+
 export async function generateCaption(
   post: Post,
   campaign: Campaign,
@@ -70,8 +93,11 @@ export async function generateCaption(
     throw new Error("No AI API key found. Please enter your API key in the Settings page.");
   }
 
-  const systemPrompt = buildSystemPrompt(campaign);
-  const userPrompt = buildUserPrompt(post);
+  // Fetch full content if possible
+  const fullContent = await fetchFullContent(post.sourceUrl);
+  
+  const systemPrompt = buildSystemPrompt(campaign, overridePrompt);
+  const userPrompt = buildUserPrompt(post, fullContent);
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
@@ -108,6 +134,7 @@ export async function generateCaption(
     await storage.createLog({
       campaignId: campaign.id,
       postId: post.id,
+      userId: campaign.userId,
       level: "info",
       message: `Caption generated successfully`,
       metadata: { model: config.model, captionLength: caption.length },
@@ -120,6 +147,7 @@ export async function generateCaption(
     await storage.createLog({
       campaignId: campaign.id,
       postId: post.id,
+      userId: campaign.userId,
       level: "error",
       message: `Caption generation failed: ${errorMessage}`,
       metadata: { model: config.model },
@@ -129,9 +157,7 @@ export async function generateCaption(
   }
 }
 
-function buildSystemPrompt(campaign: Campaign,
-                          overridePrompt?: string
-): string {
+function buildSystemPrompt(campaign: Campaign, overridePrompt?: string): string {
   const defaultPrompt = `You are a social media content creator. Create engaging, concise social media posts based on the article provided. 
 Keep the tone professional yet approachable. Include relevant hashtags. 
 The post should be compelling and encourage engagement.
@@ -156,11 +182,13 @@ IMPORTANT: Never use "Thread x/x" or numbered thread formats in the output. Crea
   return prompt;
 }
 
-function buildUserPrompt(post: Post): string {
+function buildUserPrompt(post: Post, fullContent: string | null): string {
   let prompt = `Create a social media post based on this article:\n\n`;
   prompt += `Title: ${post.sourceTitle}\n`;
 
-  if (post.sourceSnippet) {
+  if (fullContent) {
+    prompt += `\nFull Article Content:\n${fullContent}\n`;
+  } else if (post.sourceSnippet) {
     prompt += `\nContent Summary:\n${post.sourceSnippet}\n`;
   }
 
@@ -192,7 +220,7 @@ export function validateContent(
   }
 
   for (const term of config.forbiddenTerms) {
-    if (term && term.length > 2) { // Only check terms with more than 2 characters to avoid over-matching
+    if (term && term.length > 2) {
       const regex = new RegExp(`\\b${term}\\b`, 'i');
       if (regex.test(caption)) {
         issues.push(`Contains forbidden term: "${term}"`);

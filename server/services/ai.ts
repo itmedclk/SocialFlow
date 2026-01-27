@@ -125,10 +125,15 @@ export async function generateCaption(
     }
 
     const data: ChatCompletionResponse = await response.json();
-    const caption = data.choices[0]?.message?.content?.trim();
+    let caption = data.choices[0]?.message?.content?.trim();
 
     if (!caption) {
       throw new Error("AI returned empty response");
+    }
+
+    // Append article link at the end of the post if not already present
+    if (post.sourceUrl && !caption.includes(post.sourceUrl)) {
+      caption += `\n\nRead more: ${post.sourceUrl}`;
     }
 
     await storage.createLog({

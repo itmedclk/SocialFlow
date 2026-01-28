@@ -50,13 +50,18 @@ export async function processNewPost(post: Post, campaign: Campaign): Promise<vo
       }
     }
 
-    if (!imageUrl && campaign.imageProviders && campaign.imageProviders.length > 0) {
+    if (!imageUrl) {
+      // Use campaign image providers, or fall back to default providers
+      const providers = campaign.imageProviders && campaign.imageProviders.length > 0
+        ? campaign.imageProviders
+        : [{ type: "pexels", value: "" }, { type: "unsplash", value: "" }];
+      
       const keywords = getImageKeywordsFromCampaign(campaign, post.sourceTitle);
       
       let imageAttempts = 0;
       while (!imageUrl && imageAttempts < MAX_RETRIES) {
         imageAttempts++;
-        const imageResult = await searchImage(keywords, campaign.imageProviders, campaign.id, imageAttempts - 1, settings);
+        const imageResult = await searchImage(keywords, providers, campaign.id, imageAttempts - 1, settings);
         
         if (imageResult) {
           imageUrl = imageResult.url;

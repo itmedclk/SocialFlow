@@ -26,7 +26,7 @@ interface ChatCompletionResponse {
 
 async function getAIConfig(userId?: string | null): Promise<AIConfig> {
   const baseUrlEnv =
-    process.env.AI_BASE_URL || "https://api.novita.ai/openai/chat/completions";
+    process.env.AI_BASE_URL || "https://api.novita.ai/openai";
   const apiKeyEnv = process.env.AI_API_KEY || "";
   const modelEnv = process.env.AI_MODEL || "openai/gpt-oss-20b";
 
@@ -128,8 +128,8 @@ export async function generateCaption(
       body: JSON.stringify({
         model: config.model,
         messages,
-        max_tokens: 500,
-        temperature: 0.7,
+        max_tokens: 2000,
+        temperature: 0.4,
       }),
     });
 

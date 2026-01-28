@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express from "express";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -6,17 +6,18 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export function serveStatic(app: Express) {
-  const distPath = path.join(__dirname, "public");
+export function serveStatic(app) {
+  const distPath = path.resolve(__dirname, "public");
 
   if (!fs.existsSync(distPath)) {
-    throw new Error(`Missing build folder: ${distPath}`);
+    console.error("Static folder missing:", distPath);
+    return;
   }
 
-  app.use("/", express.static(distPath));
+  app.use(express.static(distPath));
 
-  // Express v5 requires regex instead of "*"
-  app.get(/.*/, (_req, res) => {
+  // EXPRESS 5 FIX — DO NOT USE "*"
+  app.get(/.*/, (req, res) => {
     res.sendFile(path.join(distPath, "index.html"));
   });
 }

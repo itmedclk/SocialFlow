@@ -7,7 +7,8 @@ export default defineConfig({
   target: "node18",
   splitting: false,
   sourcemap: false,
-  clean: true,
+  clean: false,
+  tsconfig: "tsconfig.server.json",
   bundle: true,
   external: [
     "vite",

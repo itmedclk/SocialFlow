@@ -123,6 +123,12 @@ export async function generateCaption(
     { role: "user", content: userPrompt },
   ];
 
+  // Reduce max_tokens for short content limits to bias shorter outputs
+  // Rough estimate: 1 token ≈ 4 characters, plus buffer for JSON formatting
+  const maxLength = campaign.safetyMaxLength || 2000;
+  const estimatedTokens = Math.max(200, Math.ceil(maxLength / 3) + 100);
+  const maxTokens = maxLength < 500 ? estimatedTokens : 2000;
+
   try {
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: "POST",
@@ -133,7 +139,7 @@ export async function generateCaption(
       body: JSON.stringify({
         model: config.model,
         messages,
-        max_tokens: 2000,
+        max_tokens: maxTokens,
         temperature: 0.4,
       }),
     });
@@ -220,7 +226,7 @@ IMPORTANT: Never use "Thread x/x" or numbered thread formats in the output. Crea
   }
 
   if (campaign.safetyMaxLength) {
-    prompt += `\n\nIMPORTANT: Keep the post under ${campaign.safetyMaxLength} characters.`;
+    prompt += `\n\n*** CRITICAL LENGTH REQUIREMENT ***\nThe caption MUST be ${campaign.safetyMaxLength} characters or less. This is a hard limit - count your characters carefully. If the limit is very short (under 200 characters), write a brief, punchy caption with only 1-2 sentences and fewer hashtags.`;
   }
 
   if (campaign.targetPlatforms && campaign.targetPlatforms.length > 0) {

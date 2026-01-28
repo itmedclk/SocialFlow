@@ -788,8 +788,8 @@ export async function registerRoutes(
         // Handle cyclic search
         const currentOffset = parseInt(req.query.offset as string) || 0;
 
-        let imageUrl = null;
-        let imageCredit = null;
+        let imageUrl: string | null = null;
+        let imageCredit: string | null = null;
 
         // Only extract OG image on the first search (offset 0)
         if (currentOffset === 0) {

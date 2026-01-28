@@ -26,11 +26,17 @@ interface WikimediaResult {
   descriptionurl: string;
 }
 
+interface UserSettings {
+  pexelsApiKey?: string | null;
+  unsplashAccessKey?: string | null;
+}
+
 export async function searchImage(
   keywords: string[],
   providers: Array<{ type: string; value: string }>,
   campaignId?: number,
   offset: number = 0,
+  userSettings?: UserSettings | null,
 ): Promise<ImageResult | null> {
   const query = keywords.join(" ");
 
@@ -55,10 +61,10 @@ export async function searchImage(
 
       switch (provider.type.toLowerCase()) {
         case "unsplash":
-          result = await searchUnsplash(query, offset);
+          result = await searchUnsplash(query, offset, userSettings?.unsplashAccessKey);
           break;
         case "pexels":
-          result = await searchPexels(query, offset);
+          result = await searchPexels(query, offset, userSettings?.pexelsApiKey);
           break;
         default:
           console.warn(`Unknown or disabled image provider: ${provider.type}`);
@@ -97,8 +103,9 @@ export async function searchImage(
 async function searchUnsplash(
   query: string,
   offset: number = 0,
+  userApiKey?: string | null,
 ): Promise<ImageResult | null> {
-  const apiKey = process.env.UNSPLASH_ACCESS_KEY;
+  const apiKey = userApiKey || process.env.UNSPLASH_ACCESS_KEY;
 
   if (!apiKey) {
     throw new Error("UNSPLASH_ACCESS_KEY not configured");
@@ -135,8 +142,9 @@ async function searchUnsplash(
 async function searchPexels(
   query: string,
   offset: number = 0,
+  userApiKey?: string | null,
 ): Promise<ImageResult | null> {
-  const apiKey = process.env.PEXELS_API_KEY;
+  const apiKey = userApiKey || process.env.PEXELS_API_KEY;
 
   if (!apiKey) {
     throw new Error("PEXELS_API_KEY not configured");

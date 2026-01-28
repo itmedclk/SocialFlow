@@ -6,6 +6,7 @@ import {
   processNextPosts,
 } from "./pipeline";
 import type { Campaign} from "@shared/schema"
+import { CronExpressionParser } from "cron-parser";
 
 let mainLoopId: NodeJS.Timeout | null = null;
 
@@ -36,21 +37,17 @@ export function startScheduler(): void {
   console.log(`  - Max posts to prepare per cycle: ${MAX_POSTS_TO_PREPARE}`);
 }
 
-function getNextScheduledTime(campaign : Campaign): Date | null {
+function getNextScheduledTime(campaign: Campaign): Date | null {
   if (!campaign.scheduleCron) return null;
 
-  const [minute, hour] = campaign.scheduleCron.split("").map(Number);
-  const now = new Date();
-  const next = new Date();
-  next.setHours(hour, minute, 0, 0)
-
-  next.setHours(hour, minute, 0, 0);
-
-  if (next <= now) {
-    next.setDate(next.getDate() + 1);
+  try {
+    const expression = CronExpressionParser.parse(campaign.scheduleCron);
+    const next = expression.next();
+    return next.toDate();
+  } catch (error) {
+    console.error(`[Scheduler] Failed to parse cron expression: ${campaign.scheduleCron}`, error);
+    return null;
   }
-
-  return next;
 }
 
 async function runSchedulerCycle(): Promise<void> {

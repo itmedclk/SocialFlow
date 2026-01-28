@@ -56,7 +56,7 @@ export async function processNewPost(post: Post, campaign: Campaign): Promise<vo
       let imageAttempts = 0;
       while (!imageUrl && imageAttempts < MAX_RETRIES) {
         imageAttempts++;
-        const imageResult = await searchImage(keywords, campaign.imageProviders, campaign.id);
+        const imageResult = await searchImage(keywords, campaign.imageProviders, campaign.id, imageAttempts - 1, settings);
         
         if (imageResult) {
           imageUrl = imageResult.url;

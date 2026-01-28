@@ -621,7 +621,7 @@ export default function Review() {
               variant="secondary"
               className="gap-2"
               onClick={handleFetchNew}
-              disabled={!activeCampaign}
+              disabled={!activeCampaign && campaigns.length === 0}
               data-testid="button-fetch-new"
             >
               <Search className="h-4 w-4" />
@@ -712,7 +712,7 @@ export default function Review() {
           <p className="text-muted-foreground mb-4">
             No draft posts to review.
           </p>
-          <Button onClick={handleFetchNew} disabled={!activeCampaign}>
+          <Button onClick={handleFetchNew} disabled={!activeCampaign && campaigns.length === 0}>
             <Search className="h-4 w-4 mr-2" />
             Fetch New Articles
           </Button>

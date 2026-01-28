@@ -13,6 +13,7 @@ export const campaigns = pgTable("campaigns", {
   name: text("name").notNull(),
   topic: text("topic").notNull(),
   scheduleCron: text("schedule_cron"),
+  scheduleTimezone: text("schedule_timezone").default("America/Los_Angeles"),
   rssUrls: jsonb("rss_urls").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   aiPrompt: text("ai_prompt"),
   imageKeywords: jsonb("image_keywords").$type<string[]>().default(sql`'[]'::jsonb`),

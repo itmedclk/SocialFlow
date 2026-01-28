@@ -42,7 +42,8 @@ function getNextScheduledTime(campaign: Campaign): Date | null {
   if (!campaign.scheduleCron) return null;
 
   try {
-    const expression = CronExpressionParser.parse(campaign.scheduleCron);
+    const timezone = campaign.scheduleTimezone || "America/Los_Angeles";
+    const expression = CronExpressionParser.parse(campaign.scheduleCron, { tz: timezone });
     const next = expression.next();
     return next.toDate();
   } catch (error) {

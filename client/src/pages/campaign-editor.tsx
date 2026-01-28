@@ -66,6 +66,7 @@ export default function CampaignEditor() {
   const [scheduleFrequency, setScheduleFrequency] = useState<ScheduleFrequency>("daily");
   const [scheduleTime, setScheduleTime] = useState("09:00");
   const [scheduleDays, setScheduleDays] = useState<string[]>([]);
+  const [scheduleTimezone, setScheduleTimezone] = useState("America/Los_Angeles");
   const [rssUrls, setRssUrls] = useState<string[]>([""]);
   const [imageKeywords, setImageKeywords] = useState<string[]>([]);
   const [imageSources, setImageSources] = useState<{type: string, value: string}[]>([
@@ -108,6 +109,7 @@ export default function CampaignEditor() {
       setSelectedPlatforms(campaign.targetPlatforms || []);
       setUseSpecificAccount(campaign.useSpecificAccount ?? false);
       setSpecificAccountId(campaign.specificAccountId || "");
+      setScheduleTimezone(campaign.scheduleTimezone || "America/Los_Angeles");
       setAiPrompt(campaign.aiPrompt || "");
       setSafetyForbiddenTerms(campaign.safetyForbiddenTerms || "");
       setSafetyMaxLength(campaign.safetyMaxLength || 2000);
@@ -183,6 +185,7 @@ export default function CampaignEditor() {
       name: name.trim(),
       topic: topic.trim(),
       scheduleCron: cronExpression || null,
+      scheduleTimezone,
       rssUrls: validRssUrls,
       imageKeywords,
       imageProviders: validImageSources,
@@ -393,10 +396,31 @@ export default function CampaignEditor() {
                   </div>
                 )}
                 
+                <div className="space-y-2 mt-4">
+                  <Label>Timezone</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    value={scheduleTimezone}
+                    onChange={(e) => setScheduleTimezone(e.target.value)}
+                    data-testid="select-timezone"
+                  >
+                    <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                    <option value="America/Denver">Mountain Time (MT)</option>
+                    <option value="America/Chicago">Central Time (CT)</option>
+                    <option value="America/New_York">Eastern Time (ET)</option>
+                    <option value="UTC">UTC</option>
+                    <option value="Europe/London">London (GMT/BST)</option>
+                    <option value="Europe/Paris">Paris (CET)</option>
+                    <option value="Asia/Tokyo">Tokyo (JST)</option>
+                    <option value="Asia/Shanghai">Shanghai (CST)</option>
+                    <option value="Australia/Sydney">Sydney (AEST)</option>
+                  </select>
+                </div>
+                
                 <p className="text-xs text-muted-foreground mt-2">
                   {scheduleFrequency === "hourly" && "Campaign will run at the start of every interval."}
-                  {scheduleFrequency === "daily" && `Campaign will run every day at ${scheduleTime}.`}
-                  {scheduleFrequency === "weekly" && scheduleDays.length > 0 && `Campaign will run on ${scheduleDays.join(", ")} at ${scheduleTime}.`}
+                  {scheduleFrequency === "daily" && `Campaign will run every day at ${scheduleTime} (${scheduleTimezone.split('/').pop()?.replace('_', ' ')}).`}
+                  {scheduleFrequency === "weekly" && scheduleDays.length > 0 && `Campaign will run on ${scheduleDays.join(", ")} at ${scheduleTime} (${scheduleTimezone.split('/').pop()?.replace('_', ' ')}).`}
                   {scheduleFrequency === "weekly" && scheduleDays.length === 0 && "Select at least one day for the campaign to run."}
                 </p>
               </CardContent>

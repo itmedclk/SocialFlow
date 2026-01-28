@@ -84,14 +84,30 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
       }
     }
 
+    // If auto-publish is enabled, set post to scheduled for immediate publishing
+    // Otherwise, set to draft for manual review
+    const newStatus = campaign.autoPublish ? "scheduled" : "draft";
+    const scheduledFor = campaign.autoPublish ? new Date() : null;
+
     await storage.updatePost(post.id, {
       generatedCaption: caption,
       imageUrl: imageUrl || null,
       imageCredit: imageCredit || null,
       imageSearchPhrase: imageSearchPhrase || null,
-      status: "draft",
+      status: newStatus,
+      scheduledFor,
       aiModel: modelName,
     });
+
+    if (campaign.autoPublish) {
+      await storage.createLog({
+        campaignId: campaign.id,
+        postId: post.id,
+        userId: campaign.userId,
+        level: "info",
+        message: "Post auto-approved and scheduled for immediate publishing",
+      });
+    }
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

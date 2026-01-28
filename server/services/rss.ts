@@ -1,21 +1,7 @@
 import Parser from "rss-parser";
 import { storage } from "../storage";
-import { Campaign, campaigns, type InsertPost } from "@shared/schema";
+import { type InsertPost } from "@shared/schema";
 import { processNewPost } from "./pipeline";
-import { CronExpressionParser } from "cron-parser";
-
-function getNextScheduledTime(campaign: Campaign): Date | null {
-  if (!campaign.scheduleCron) return null;
-
-  try {
-    const expression = CronExpressionParser.parse(campaign.scheduleCron);
-    const next = expression.next();
-    return next.toDate();
-  } catch (error) {
-    console.error(`[RSS] Failed to parse cron expression: ${campaign.scheduleCron}`, error);
-    return null;
-  }
-}
 
 const parser = new Parser({
   timeout: 10000,
@@ -129,37 +115,12 @@ export async function processCampaignFeeds(campaignId: number, userId?: string):
           const newPost = await storage.createPost(postData);
           result.new++;
 
-          // If autoPublish is enabled, process and schedule the post automatically
+          // If autoPublish is enabled, process the post automatically
+          // The pipeline will set status to "scheduled" for immediate publishing
           if (campaign.autoPublish && newPost) {
             try {
               await processNewPost(newPost, campaign);
-              
-              // Calculate next scheduled time based on campaign cron
-              const scheduledFor = getNextScheduledTime(campaign);
-              
-              if (scheduledFor) {
-                await storage.updatePost(newPost.id, {
-                  status: "scheduled",
-                  scheduledFor,
-                });
-
-                await storage.createLog({
-                  campaignId,
-                  postId: newPost.id,
-                  userId: userId || campaign.userId,
-                  level: "info",
-                  message: `Post auto-processed and scheduled for ${scheduledFor.toISOString()}`,
-                });
-              } else {
-                // No valid schedule, leave as draft with caption generated
-                await storage.createLog({
-                  campaignId,
-                  postId: newPost.id,
-                  userId: userId || campaign.userId,
-                  level: "warning",
-                  message: "Post processed but no valid schedule found - left as draft for manual scheduling",
-                });
-              }
+              // Pipeline already logs and sets status to scheduled with immediate scheduledFor
             } catch (error) {
               console.error(`[RSS] Auto-process failed for post ${newPost.id}:`, error);
             }

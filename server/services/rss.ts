@@ -95,7 +95,7 @@ export async function processCampaignFeeds(campaignId: number, userId?: string, 
       // Fetch only 30 items per feed source
       const limitedArticles = articles.slice(0, 30);
       result.fetched += limitedArticles.length;
-
+      
       for (const article of limitedArticles) {
         const isNew = await isNewArticle(article.guid, userId);
         
@@ -112,19 +112,9 @@ export async function processCampaignFeeds(campaignId: number, userId?: string, 
             status: "draft",
           };
 
-          const newPost = await storage.createPost(postData);
+          await storage.createPost(postData);
           result.new++;
-
-          // If autoPublish is enabled, process the post automatically
-          // The pipeline will set status to "scheduled" with the target time
-          if (campaign.autoPublish && newPost) {
-            try {
-              await processNewPost(newPost, campaign, undefined, targetScheduledTime);
-              // Pipeline already logs and sets status to scheduled
-            } catch (error) {
-              console.error(`[RSS] Auto-process failed for post ${newPost.id}:`, error);
-            }
-          }
+          // Drafts are created here - scheduling is handled by the scheduler
         }
       }
     } catch (error) {

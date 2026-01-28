@@ -4,6 +4,7 @@ import {
   processDraftPosts,
   publishScheduledPosts,
   processNextPosts,
+  processNewPost,
 } from "./pipeline";
 import type { Campaign} from "@shared/schema"
 import { CronExpressionParser } from "cron-parser";
@@ -11,7 +12,7 @@ import { CronExpressionParser } from "cron-parser";
 let mainLoopId: NodeJS.Timeout | null = null;
 
 const MAIN_LOOP_INTERVAL = 5 * 60 * 1000;
-const PREPARATION_WINDOW_MINUTES = 30;
+const PREPARATION_WINDOW_MINUTES = 120; // Prepare posts 2 hours before scheduled time
 const MAX_POSTS_TO_PREPARE = 2;
 
 export function startScheduler(): void {
@@ -55,16 +56,25 @@ async function runSchedulerCycle(): Promise<void> {
   const campaigns = await storage.getActiveCampaigns();
 
   for (const campaign of campaigns) {
-    const shouldFetchRSS = await shouldRunRSSFetch(campaign);
-    if (shouldFetchRSS) {
-      console.log(`[Scheduler] Fetching RSS for campaign ${campaign.id}...`);
-      try {
-        await processCampaignFeeds(campaign.id);
-      } catch (error) {
-        console.error(
-          `[Scheduler] RSS fetch error for campaign ${campaign.id}:`,
-          error,
-        );
+    // For auto-publish campaigns, check if we need to schedule a post
+    if (campaign.autoPublish) {
+      const needsScheduling = await checkAndScheduleNextPost(campaign);
+      if (needsScheduling) {
+        console.log(`[Scheduler] Processing auto-publish for campaign ${campaign.id}...`);
+      }
+    } else {
+      // For manual campaigns, use the old RSS fetch logic
+      const shouldFetchRSS = await shouldRunRSSFetch(campaign);
+      if (shouldFetchRSS) {
+        console.log(`[Scheduler] Fetching RSS for campaign ${campaign.id}...`);
+        try {
+          await processCampaignFeeds(campaign.id);
+        } catch (error) {
+          console.error(
+            `[Scheduler] RSS fetch error for campaign ${campaign.id}:`,
+            error,
+          );
+        }
       }
     }
   }
@@ -92,6 +102,86 @@ async function runSchedulerCycle(): Promise<void> {
     }
   } catch (error) {
     console.error("[Scheduler] Publish error:", error);
+  }
+}
+
+// Check if the next scheduled slot has a post, if not, fetch RSS and process one
+async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
+  const nextScheduledTime = getNextScheduledTime(campaign);
+  if (!nextScheduledTime) return false;
+
+  const now = new Date();
+  const timeUntilNext = (nextScheduledTime.getTime() - now.getTime()) / (1000 * 60); // in minutes
+
+  // Only prepare posts within the 2-hour window
+  if (timeUntilNext > PREPARATION_WINDOW_MINUTES || timeUntilNext < 0) {
+    return false;
+  }
+
+  // Check if there's already a post scheduled for this time slot
+  const posts = await storage.getPostsByCampaign(campaign.id);
+  const hasScheduledPost = posts.some((post) => {
+    if (post.status !== "scheduled" || !post.scheduledFor) return false;
+    const postTime = new Date(post.scheduledFor);
+    // Check if a post is scheduled within 5 minutes of the next slot
+    const timeDiff = Math.abs(postTime.getTime() - nextScheduledTime.getTime()) / (1000 * 60);
+    return timeDiff < 5;
+  });
+
+  if (hasScheduledPost) {
+    return false; // Already have a post scheduled for this slot
+  }
+
+  // No post scheduled - fetch RSS and process with the target time
+  console.log(`[Scheduler] No post scheduled for ${nextScheduledTime.toISOString()}, fetching RSS...`);
+  
+  try {
+    const result = await processCampaignFeeds(campaign.id, undefined, nextScheduledTime);
+    if (result.new > 0) {
+      console.log(`[Scheduler] Found ${result.new} new articles, scheduled for ${nextScheduledTime.toISOString()}`);
+      return true;
+    }
+    
+    // No new articles from RSS - try to find an existing draft to schedule
+    console.log(`[Scheduler] No new articles, looking for existing drafts...`);
+    const existingDraft = posts.find((post) => 
+      post.status === "draft" && post.generatedCaption
+    );
+    
+    if (existingDraft) {
+      // Schedule this existing draft for the target time
+      await storage.updatePost(existingDraft.id, {
+        status: "scheduled",
+        scheduledFor: nextScheduledTime,
+      });
+      await storage.createLog({
+        campaignId: campaign.id,
+        postId: existingDraft.id,
+        userId: campaign.userId,
+        level: "info",
+        message: `Existing draft scheduled for ${nextScheduledTime.toISOString()}`,
+      });
+      console.log(`[Scheduler] Scheduled existing draft ${existingDraft.id} for ${nextScheduledTime.toISOString()}`);
+      return true;
+    }
+    
+    // No drafts with captions - try to process an unprocessed draft
+    const unprocessedDraft = posts.find((post) => 
+      post.status === "draft" && !post.generatedCaption
+    );
+    
+    if (unprocessedDraft) {
+      console.log(`[Scheduler] Processing unprocessed draft ${unprocessedDraft.id}...`);
+      await processNewPost(unprocessedDraft, campaign, undefined, nextScheduledTime);
+      console.log(`[Scheduler] Processed and scheduled draft ${unprocessedDraft.id} for ${nextScheduledTime.toISOString()}`);
+      return true;
+    }
+    
+    console.log(`[Scheduler] No articles or drafts available for scheduling`);
+    return false;
+  } catch (error) {
+    console.error(`[Scheduler] Auto-publish RSS fetch error for campaign ${campaign.id}:`, error);
+    return false;
   }
 }
 

@@ -20,7 +20,7 @@ function getNextScheduledTime(campaign: Campaign): Date | null {
   }
 }
 
-export async function processNewPost(post: Post, campaign: Campaign, overridePrompt?: string): Promise<void> {
+export async function processNewPost(post: Post, campaign: Campaign, overridePrompt?: string, targetScheduledTime?: Date): Promise<void> {
   try {
     const safetyConfig = getSafetyConfigFromCampaign(campaign);
     let caption: string | null = null;
@@ -98,13 +98,14 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
       }
     }
 
-    // If auto-publish is enabled, calculate next scheduled time from campaign cron
+    // If auto-publish is enabled, use the target scheduled time or calculate from cron
     // Otherwise, set to draft for manual review
     let newStatus: "draft" | "scheduled" = "draft";
     let scheduledFor: Date | null = null;
 
     if (campaign.autoPublish) {
-      scheduledFor = getNextScheduledTime(campaign);
+      // Use explicitly passed target time, or calculate from cron
+      scheduledFor = targetScheduledTime || getNextScheduledTime(campaign);
       if (scheduledFor) {
         newStatus = "scheduled";
       }
@@ -299,6 +300,9 @@ export async function processNextPosts(
 
   for (const campaign of allCampaigns) {
     if (prepared >= maxPosts) break;
+    
+    // Skip auto-publish campaigns - they're handled by checkAndScheduleNextPost
+    if (campaign.autoPublish) continue;
 
     const posts = await storage.getPostsByCampaign(campaign.id);
     

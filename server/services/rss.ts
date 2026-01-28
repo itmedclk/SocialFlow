@@ -68,7 +68,7 @@ export async function isNewArticle(guid: string, userId?: string): Promise<boole
   return !existingPost;
 }
 
-export async function processCampaignFeeds(campaignId: number, userId?: string): Promise<{
+export async function processCampaignFeeds(campaignId: number, userId?: string, targetScheduledTime?: Date): Promise<{
   fetched: number;
   new: number;
   errors: string[];
@@ -116,11 +116,11 @@ export async function processCampaignFeeds(campaignId: number, userId?: string):
           result.new++;
 
           // If autoPublish is enabled, process the post automatically
-          // The pipeline will set status to "scheduled" for immediate publishing
+          // The pipeline will set status to "scheduled" with the target time
           if (campaign.autoPublish && newPost) {
             try {
-              await processNewPost(newPost, campaign);
-              // Pipeline already logs and sets status to scheduled with immediate scheduledFor
+              await processNewPost(newPost, campaign, undefined, targetScheduledTime);
+              // Pipeline already logs and sets status to scheduled
             } catch (error) {
               console.error(`[RSS] Auto-process failed for post ${newPost.id}:`, error);
             }

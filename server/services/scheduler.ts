@@ -68,7 +68,7 @@ async function runSchedulerCycle(): Promise<void> {
       if (shouldFetchRSS) {
         console.log(`[Scheduler] Fetching RSS for campaign ${campaign.id}...`);
         try {
-          await processCampaignFeeds(campaign.id);
+          await processCampaignFeeds(campaign.id, campaign.userId);
         } catch (error) {
           console.error(
             `[Scheduler] RSS fetch error for campaign ${campaign.id}:`,
@@ -136,7 +136,7 @@ async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
   console.log(`[Scheduler] No post scheduled for ${nextScheduledTime.toISOString()}, fetching RSS...`);
   
   try {
-    const result = await processCampaignFeeds(campaign.id, undefined, nextScheduledTime);
+    const result = await processCampaignFeeds(campaign.id, campaign.userId, nextScheduledTime);
     if (result.new > 0) {
       console.log(`[Scheduler] Found ${result.new} new articles, scheduled for ${nextScheduledTime.toISOString()}`);
       return true;

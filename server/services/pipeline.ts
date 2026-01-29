@@ -266,8 +266,22 @@ export async function publishScheduledPosts(): Promise<{
   const allCampaigns = await storage.getActiveCampaigns();
   
   const result = { published: 0, failed: 0 };
+  
+  // Track account IDs that have already published in this cycle to prevent duplicates
+  const publishedAccountIds = new Set<string>();
 
   for (const campaign of allCampaigns) {
+    // Get the account ID(s) this campaign uses
+    const campaignAccountId = campaign.useSpecificAccount && campaign.specificAccountId 
+      ? campaign.specificAccountId 
+      : null;
+    
+    // Skip if this account already published in this cycle
+    if (campaignAccountId && publishedAccountIds.has(campaignAccountId)) {
+      console.log(`[Scheduler] Skipping campaign ${campaign.id} - account ${campaignAccountId} already published this cycle`);
+      continue;
+    }
+    
     const posts = await storage.getPostsByCampaign(campaign.id, 50, campaign.userId);
     const scheduledPosts = posts.filter(
       (p) =>
@@ -277,9 +291,21 @@ export async function publishScheduledPosts(): Promise<{
     );
 
     for (const post of scheduledPosts) {
+      // Double-check the post hasn't been published already (race condition protection)
+      const currentPost = await storage.getPost(post.id);
+      if (currentPost?.status !== "scheduled") {
+        console.log(`[Scheduler] Skipping post ${post.id} - status changed to ${currentPost?.status}`);
+        continue;
+      }
+      
       try {
         await publishPost(post, campaign);
         result.published++;
+        
+        // Mark this account as having published
+        if (campaignAccountId) {
+          publishedAccountIds.add(campaignAccountId);
+        }
       } catch (error) {
         result.failed++;
       }

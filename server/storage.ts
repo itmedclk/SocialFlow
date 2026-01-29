@@ -23,6 +23,7 @@ export interface IStorage {
   updatePost(id: number, post: Partial<InsertPost>, userId?: string): Promise<Post | undefined>;
   getScheduledPosts(userId?: string): Promise<Post[]>;
   getDraftPosts(campaignId?: number, userId?: string): Promise<Post[]>;
+  deleteDraftPostsByCampaign(campaignId: number, userId?: string): Promise<number>;
   
   // Log methods (with userId filtering)
   createLog(log: InsertLog): Promise<Log>;
@@ -56,6 +57,8 @@ export class DatabaseStorage implements IStorage {
           unsplashAccessKey: settings.unsplashAccessKey,
           pexelsApiKey: settings.pexelsApiKey,
           postlyWorkspaceId: settings.postlyWorkspaceId,
+          aiImageModel: settings.aiImageModel,
+          novitaApiKey: settings.novitaApiKey,
           updatedAt: new Date(),
         },
       })
@@ -231,6 +234,29 @@ export class DatabaseStorage implements IStorage {
       .from(posts)
       .where(eq(posts.status, draftStatus))
       .orderBy(desc(posts.pubDate), desc(posts.createdAt));
+  }
+
+  async deleteDraftPostsByCampaign(campaignId: number, userId?: string): Promise<number> {
+    const draftStatus = "draft" as const;
+    const drafts = userId
+      ? await db
+          .select({ id: posts.id })
+          .from(posts)
+          .where(and(eq(posts.campaignId, campaignId), eq(posts.status, draftStatus), eq(posts.userId, userId)))
+      : await db
+          .select({ id: posts.id })
+          .from(posts)
+          .where(and(eq(posts.campaignId, campaignId), eq(posts.status, draftStatus)));
+
+    if (drafts.length === 0) {
+      return 0;
+    }
+
+    for (const draft of drafts) {
+      await db.delete(posts).where(eq(posts.id, draft.id));
+    }
+
+    return drafts.length;
   }
 
   // ============================================

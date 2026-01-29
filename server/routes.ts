@@ -901,5 +901,98 @@ export async function registerRoutes(
     },
   );
 
+  // Endpoint to generate AI image for a post (authenticated)
+  app.post(
+    "/api/posts/:id/generate-image",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "Invalid post ID" });
+        }
+
+        const post = await storage.getPost(id, userId);
+        if (!post) {
+          return res.status(404).json({ error: "Post not found" });
+        }
+
+        if (!post.generatedCaption) {
+          return res.status(400).json({ error: "Caption must be generated first" });
+        }
+
+        const campaign = await storage.getCampaign(post.campaignId, userId);
+        if (!campaign) {
+          return res.status(404).json({ error: "Campaign not found" });
+        }
+
+        const userSettings = await storage.getUserSettings(userId);
+        if (!userSettings?.novitaApiKey) {
+          return res.status(400).json({ error: "Novita API key not configured in settings" });
+        }
+
+        const { generateAiImage, generateImagePrompt } = await import("./services/ai-image");
+
+        const imagePrompt = generateImagePrompt(post.generatedCaption, campaign.topic);
+        const imageResult = await generateAiImage(
+          imagePrompt,
+          userSettings.aiImageModel || "flux-1-schnell",
+          userSettings.novitaApiKey,
+          campaign.id,
+        );
+
+        if (imageResult) {
+          await storage.updatePost(id, { 
+            imageUrl: imageResult.url, 
+            imageCredit: imageResult.credit 
+          }, userId);
+          const updatedPost = await storage.getPost(id, userId);
+          res.json({ success: true, post: updatedPost });
+        } else {
+          res.json({ success: false, message: "Failed to generate image" });
+        }
+      } catch (error) {
+        console.error("Error generating AI image:", error);
+        const errorMessage = error instanceof Error ? error.message : "Failed to generate image";
+        res.status(500).json({ error: errorMessage });
+      }
+    },
+  );
+
+  // Endpoint to delete all draft posts for a campaign (authenticated)
+  app.delete(
+    "/api/campaigns/:id/posts/drafts",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "Invalid campaign ID" });
+        }
+
+        const campaign = await storage.getCampaign(id, userId);
+        if (!campaign) {
+          return res.status(404).json({ error: "Campaign not found" });
+        }
+
+        const deletedCount = await storage.deleteDraftPostsByCampaign(id, userId);
+        
+        await storage.createLog({
+          campaignId: id,
+          userId,
+          level: "info",
+          message: `Cleared ${deletedCount} draft posts`,
+        });
+
+        res.json({ success: true, deletedCount });
+      } catch (error) {
+        console.error("Error deleting draft posts:", error);
+        res.status(500).json({ error: "Failed to delete draft posts" });
+      }
+    },
+  );
+
   return httpServer;
 }

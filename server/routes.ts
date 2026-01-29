@@ -188,7 +188,8 @@ export async function registerRoutes(
           return res.status(404).json({ error: "Campaign not found" });
         }
         // Fetch all posts for this campaign (not filtered by userId to include legacy posts)
-        posts = await storage.getPostsByCampaign(campaignId, 50);
+        // Use a higher limit to ensure all posts including older published ones are returned
+        posts = await storage.getPostsByCampaign(campaignId, 500);
       } else {
         posts = await storage.getDraftPosts(undefined, userId);
       }

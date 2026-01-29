@@ -267,21 +267,10 @@ export async function publishScheduledPosts(): Promise<{
   
   const result = { published: 0, failed: 0 };
   
-  // Track account IDs that have already published in this cycle to prevent duplicates
-  const publishedAccountIds = new Set<string>();
+  // Track post IDs that have already been published in this cycle to prevent duplicates
+  const publishedPostIds = new Set<number>();
 
   for (const campaign of allCampaigns) {
-    // Get the account ID(s) this campaign uses
-    const campaignAccountId = campaign.useSpecificAccount && campaign.specificAccountId 
-      ? campaign.specificAccountId 
-      : null;
-    
-    // Skip if this account already published in this cycle
-    if (campaignAccountId && publishedAccountIds.has(campaignAccountId)) {
-      console.log(`[Scheduler] Skipping campaign ${campaign.id} - account ${campaignAccountId} already published this cycle`);
-      continue;
-    }
-    
     const posts = await storage.getPostsByCampaign(campaign.id, 50, campaign.userId);
     const scheduledPosts = posts.filter(
       (p) =>
@@ -291,6 +280,12 @@ export async function publishScheduledPosts(): Promise<{
     );
 
     for (const post of scheduledPosts) {
+      // Skip if this post was already published in this cycle
+      if (publishedPostIds.has(post.id)) {
+        console.log(`[Scheduler] Skipping post ${post.id} - already published this cycle`);
+        continue;
+      }
+      
       // Double-check the post hasn't been published already (race condition protection)
       const currentPost = await storage.getPost(post.id);
       if (currentPost?.status !== "scheduled") {
@@ -302,10 +297,8 @@ export async function publishScheduledPosts(): Promise<{
         await publishPost(post, campaign);
         result.published++;
         
-        // Mark this account as having published
-        if (campaignAccountId) {
-          publishedAccountIds.add(campaignAccountId);
-        }
+        // Mark this post as published to prevent duplicate publishing
+        publishedPostIds.add(post.id);
       } catch (error) {
         result.failed++;
       }

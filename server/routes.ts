@@ -182,7 +182,13 @@ export async function registerRoutes(
       } else if (status === "scheduled") {
         posts = await storage.getScheduledPosts(userId);
       } else if (campaignId) {
-        posts = await storage.getPostsByCampaign(campaignId, 50, userId);
+        // Verify user owns this campaign first
+        const campaign = await storage.getCampaign(campaignId, userId);
+        if (!campaign) {
+          return res.status(404).json({ error: "Campaign not found" });
+        }
+        // Fetch all posts for this campaign (not filtered by userId to include legacy posts)
+        posts = await storage.getPostsByCampaign(campaignId, 50);
       } else {
         posts = await storage.getDraftPosts(undefined, userId);
       }
@@ -202,7 +208,20 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid post ID" });
       }
 
-      const post = await storage.getPost(id, userId);
+      // First try to get post by userId
+      let post = await storage.getPost(id, userId);
+      
+      // If not found, check if user owns the campaign this post belongs to
+      if (!post) {
+        const anyPost = await storage.getPost(id);
+        if (anyPost && anyPost.campaignId) {
+          const campaign = await storage.getCampaign(anyPost.campaignId, userId);
+          if (campaign) {
+            post = anyPost; // User owns the campaign, allow access
+          }
+        }
+      }
+      
       if (!post) {
         return res.status(404).json({ error: "Post not found" });
       }

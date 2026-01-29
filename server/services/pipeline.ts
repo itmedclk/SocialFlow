@@ -1,6 +1,7 @@
 import { storage } from "../storage";
 import { generateCaption, validateContent, getSafetyConfigFromCampaign } from "./ai";
 import { searchImage, extractOgImage, getImageKeywordsFromCampaign } from "./images";
+import { generateAiImage, generateImagePrompt } from "./ai-image";
 import { publishToPostly } from "./postly";
 import { CronExpressionParser } from "cron-parser";
 import type { Post, Campaign } from "@shared/schema";
@@ -59,7 +60,56 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
 
     let imageUrl = post.imageUrl;
     let imageCredit: string | null = null;
+    let aiImageAttempted = false;
 
+    // Check if campaign uses AI image generation
+    if (campaign.useAiImage && caption && settings?.novitaApiKey) {
+      aiImageAttempted = true;
+      // Generate AI image from caption
+      try {
+        const imagePrompt = generateImagePrompt(caption, campaign.topic);
+        const aiImageResult = await generateAiImage(
+          imagePrompt,
+          settings.aiImageModel || "flux-1-schnell",
+          settings.novitaApiKey,
+          campaign.id,
+        );
+        
+        if (aiImageResult) {
+          imageUrl = aiImageResult.url;
+          imageCredit = aiImageResult.credit;
+          
+          await storage.createLog({
+            campaignId: campaign.id,
+            postId: post.id,
+            userId: campaign.userId,
+            level: "info",
+            message: "AI image generated successfully",
+          });
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        await storage.createLog({
+          campaignId: campaign.id,
+          postId: post.id,
+          userId: campaign.userId,
+          level: "warning",
+          message: `AI image generation failed, falling back to stock images: ${errorMessage}`,
+        });
+        // Fall through to stock image search
+      }
+    } else if (campaign.useAiImage && !settings?.novitaApiKey) {
+      // AI image enabled but no API key configured - log and fall back to stock
+      await storage.createLog({
+        campaignId: campaign.id,
+        postId: post.id,
+        userId: campaign.userId,
+        level: "warning",
+        message: "AI image generation enabled but Novita API key not configured, falling back to stock images",
+      });
+    }
+
+    // If no AI image, try extracting OG image from source
     if (!imageUrl) {
       const ogImage = await extractOgImage(post.sourceUrl);
       if (ogImage) {
@@ -68,6 +118,7 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
       }
     }
 
+    // If still no image, search stock photos (always fall back regardless of AI image setting)
     if (!imageUrl) {
       // Use campaign image providers, or fall back to default providers
       const providers = campaign.imageProviders && campaign.imageProviders.length > 0

@@ -201,7 +201,32 @@ async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
       return true;
     }
     
-    console.log(`[Scheduler] No drafts available for scheduling`);
+    // Step 3: No drafts at all - fetch RSS to get new articles
+    console.log(`[Scheduler] No drafts found, fetching RSS for campaign ${campaign.id}...`);
+    try {
+      const rssResult = await processCampaignFeeds(campaign.id, campaign.userId, nextScheduledTime);
+      if (rssResult.new > 0) {
+        console.log(`[Scheduler] Found ${rssResult.new} new articles from RSS`);
+        
+        // Refresh posts list to get newly created drafts
+        const refreshedPosts = await storage.getPostsByCampaign(campaign.id, 50, campaign.userId);
+        const newDrafts = refreshedPosts
+          .filter((post) => post.status === "draft" && !post.generatedCaption)
+          .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
+        
+        if (newDrafts.length > 0) {
+          const newestDraft = newDrafts[0];
+          console.log(`[Scheduler] Processing new draft ${newestDraft.id} for ${nextScheduledTime.toISOString()}...`);
+          await processNewPost(newestDraft, campaign, undefined, nextScheduledTime);
+          console.log(`[Scheduler] Processed and scheduled new draft ${newestDraft.id}`);
+          return true;
+        }
+      }
+    } catch (error) {
+      console.error(`[Scheduler] RSS fetch error for campaign ${campaign.id}:`, error);
+    }
+    
+    console.log(`[Scheduler] No content available for scheduling`);
     return false;
   } catch (error) {
     console.error(`[Scheduler] Auto-publish error for campaign ${campaign.id}:`, error);

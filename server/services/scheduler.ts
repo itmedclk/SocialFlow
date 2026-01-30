@@ -10,10 +10,12 @@ import type { Campaign} from "@shared/schema"
 import { CronExpressionParser } from "cron-parser";
 
 let mainLoopId: NodeJS.Timeout | null = null;
+let lastCleanupDate: string | null = null;
 
 const MAIN_LOOP_INTERVAL = 5 * 60 * 1000;
 const PREPARATION_WINDOW_MINUTES = 120; // Prepare posts 2 hours before scheduled time
 const MAX_POSTS_TO_PREPARE = 2;
+const OLD_POST_DAYS = 30; // Delete published posts older than 30 days
 
 export function startScheduler(): void {
   console.log("[Scheduler] Starting smart scheduler...");
@@ -104,6 +106,31 @@ async function runSchedulerCycle(): Promise<void> {
   } catch (error) {
     console.error("[Scheduler] Publish error:", error);
   }
+
+  // Run daily cleanup of old published posts
+  try {
+    await runDailyCleanup();
+  } catch (error) {
+    console.error("[Scheduler] Cleanup error:", error);
+  }
+}
+
+async function runDailyCleanup(): Promise<void> {
+  const today = new Date().toISOString().split("T")[0];
+  
+  // Only run once per day
+  if (lastCleanupDate === today) {
+    return;
+  }
+  
+  console.log("[Scheduler] Running daily cleanup of old published posts...");
+  const deleted = await storage.deleteOldPublishedPosts(OLD_POST_DAYS);
+  
+  if (deleted > 0) {
+    console.log(`[Scheduler] Deleted ${deleted} posts published more than ${OLD_POST_DAYS} days ago`);
+  }
+  
+  lastCleanupDate = today;
 }
 
 // Check if the next scheduled slot has a post, if not, fetch RSS and process one

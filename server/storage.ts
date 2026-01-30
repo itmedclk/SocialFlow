@@ -1,6 +1,6 @@
 import { campaigns, posts, logs, userSettings, type Campaign, type InsertCampaign, type Post, type InsertPost, type Log, type InsertLog, type UserSettings, type InsertUserSettings } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, lt } from "drizzle-orm";
 
 export interface IStorage {
   // User settings methods
@@ -24,6 +24,7 @@ export interface IStorage {
   getScheduledPosts(userId?: string): Promise<Post[]>;
   getDraftPosts(campaignId?: number, userId?: string): Promise<Post[]>;
   deleteDraftPostsByCampaign(campaignId: number, userId?: string): Promise<number>;
+  deleteOldPublishedPosts(daysOld: number): Promise<number>;
   
   // Log methods (with userId filtering)
   createLog(log: InsertLog): Promise<Log>;
@@ -257,6 +258,27 @@ export class DatabaseStorage implements IStorage {
     }
 
     return drafts.length;
+  }
+
+  async deleteOldPublishedPosts(daysOld: number): Promise<number> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+    
+    const postedStatus = "posted" as const;
+    const oldPosts = await db
+      .select({ id: posts.id })
+      .from(posts)
+      .where(and(eq(posts.status, postedStatus), lt(posts.postedAt, cutoffDate)));
+    
+    if (oldPosts.length === 0) {
+      return 0;
+    }
+    
+    for (const post of oldPosts) {
+      await db.delete(posts).where(eq(posts.id, post.id));
+    }
+    
+    return oldPosts.length;
   }
 
   // ============================================

@@ -544,10 +544,10 @@ export default function Settings() {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="aiImageModel">Image Model</Label>
-                  <select
+                  <Label htmlFor="aiImageModel">Image Model ID</Label>
+                  <Input
                     id="aiImageModel"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    placeholder="e.g., flux-1-schnell"
                     value={formData.aiImageModel}
                     onChange={(e) =>
                       setFormData((prev) => ({
@@ -555,15 +555,10 @@ export default function Settings() {
                         aiImageModel: e.target.value,
                       }))
                     }
-                    data-testid="select-ai-image-model"
-                  >
-                    <option value="flux-1-schnell">Flux 1 Schnell (Fast)</option>
-                    <option value="flux-1-dev">Flux 1 Dev (Quality)</option>
-                    <option value="sdxl">SDXL</option>
-                    <option value="sd-3">Stable Diffusion 3</option>
-                  </select>
+                    data-testid="input-ai-image-model"
+                  />
                   <p className="text-xs text-muted-foreground">
-                    Choose the AI model for image generation. Flux models are recommended for speed and quality.
+                    Enter the Novita AI image model ID (e.g., flux-1-schnell, flux-1-dev, sdxl, sd-3)
                   </p>
                 </div>
               </CardContent>

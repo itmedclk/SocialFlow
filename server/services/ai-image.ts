@@ -15,6 +15,7 @@ interface NovitaResponse {
   status?: string;
   code?: number;
   msg?: string;
+  message?: string;
 }
 
 interface NovitaTaskResponse {
@@ -41,40 +42,42 @@ export async function generateAiImage(
   }
 
   try {
-    const modelConfig = getModelConfig(model);
+    // Use model ID directly in the endpoint URL
+    const endpoint = `https://api.novita.ai/v3/${model}`;
     
-    const response = await fetch(modelConfig.endpoint, {
+    console.log(`[AI Image] Generating image with model: ${model}, endpoint: ${endpoint}`);
+    
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${novitaApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model_name: modelConfig.modelName,
         prompt: prompt,
-        negative_prompt: "blurry, low quality, distorted, deformed, ugly, bad anatomy, watermark, text, logo",
-        width: 1024,
-        height: 1024,
-        steps: modelConfig.steps,
-        guidance_scale: modelConfig.guidanceScale,
+        model: model,
+        size: "1024x1024",
+        guidance_scale: 7.5,
         seed: -1,
-        sampler_name: "DPM++ 2M Karras",
-        num_images: 1,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`[AI Image] API error: ${response.status} - ${errorText}`);
       throw new Error(`Novita API error: ${response.status} - ${errorText}`);
     }
 
     const data: NovitaResponse = await response.json();
+    console.log(`[AI Image] Response:`, JSON.stringify(data).substring(0, 500));
 
     if (data.code && data.code !== 0) {
-      throw new Error(`Novita API error: ${data.msg || "Unknown error"}`);
+      throw new Error(`Novita API error: ${data.msg || data.message || "Unknown error"}`);
     }
 
+    // Handle async task response
     if (data.task_id) {
+      console.log(`[AI Image] Got task_id: ${data.task_id}, polling for result...`);
       const imageUrl = await pollForResult(data.task_id, novitaApiKey);
       if (imageUrl) {
         if (campaignId) {
@@ -93,6 +96,7 @@ export async function generateAiImage(
       }
     }
 
+    // Handle direct image response
     if (data.images && data.images.length > 0 && data.images[0].image_url) {
       const imageUrl = data.images[0].image_url;
       if (campaignId) {
@@ -113,7 +117,7 @@ export async function generateAiImage(
     throw new Error("No image returned from Novita API");
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("AI image generation failed:", errorMessage);
+    console.error("[AI Image] Generation failed:", errorMessage);
 
     if (campaignId) {
       await storage.createLog({
@@ -157,51 +161,6 @@ async function pollForResult(taskId: string, apiKey: string): Promise<string | n
   }
 
   throw new Error("Image generation timed out");
-}
-
-function getModelConfig(model: string): {
-  endpoint: string;
-  modelName: string;
-  steps: number;
-  guidanceScale: number;
-} {
-  switch (model) {
-    case "flux-1-schnell":
-      return {
-        endpoint: "https://api.novita.ai/v3/async/flux-schnell",
-        modelName: "flux-schnell",
-        steps: 4,
-        guidanceScale: 0,
-      };
-    case "flux-1-dev":
-      return {
-        endpoint: "https://api.novita.ai/v3/async/flux-dev",
-        modelName: "flux-dev",
-        steps: 28,
-        guidanceScale: 3.5,
-      };
-    case "sdxl":
-      return {
-        endpoint: "https://api.novita.ai/v3/async/txt2img",
-        modelName: "sd_xl_base_1.0_0.9vae.safetensors",
-        steps: 30,
-        guidanceScale: 7.5,
-      };
-    case "sd-3":
-      return {
-        endpoint: "https://api.novita.ai/v3/async/sd3",
-        modelName: "sd3",
-        steps: 28,
-        guidanceScale: 7,
-      };
-    default:
-      return {
-        endpoint: "https://api.novita.ai/v3/async/flux-schnell",
-        modelName: "flux-schnell",
-        steps: 4,
-        guidanceScale: 0,
-      };
-  }
 }
 
 export function generateImagePrompt(caption: string, topic: string): string {

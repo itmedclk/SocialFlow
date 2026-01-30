@@ -25,8 +25,7 @@ interface ChatCompletionResponse {
 }
 
 async function getAIConfig(userId?: string | null): Promise<AIConfig> {
-  const baseUrlEnv =
-    process.env.AI_BASE_URL || "https://api.novita.ai/openai";
+  const baseUrlEnv = process.env.AI_BASE_URL || "https://api.novita.ai/openai";
   const apiKeyEnv = process.env.AI_API_KEY || "";
   const modelEnv = process.env.AI_MODEL || "openai/gpt-oss-20b";
 
@@ -176,7 +175,9 @@ export async function generateCaption(
       }
     } catch (parseError) {
       // If JSON parsing fails, use raw content as caption
-      console.warn("[AI] Failed to parse JSON response, using raw content as caption");
+      console.warn(
+        "[AI] Failed to parse JSON response, using raw content as caption",
+      );
       caption = rawContent;
     }
 
@@ -191,7 +192,12 @@ export async function generateCaption(
       userId: campaign.userId,
       level: "info",
       message: `Caption generated successfully`,
-      metadata: { model: config.model, captionLength: caption.length, imageSearchPhrase, imagePrompt: imagePrompt.substring(0, 100) },
+      metadata: {
+        model: config.model,
+        captionLength: caption.length,
+        imageSearchPhrase,
+        imagePrompt: imagePrompt.substring(0, 100),
+      },
     });
 
     return { caption, imageSearchPhrase, imagePrompt };
@@ -249,15 +255,15 @@ The imageSearchPhrase should be a short, descriptive phrase (2-4 words) that wou
 The imagePrompt should be a detailed prompt for AI image generation. CRITICAL RULES for imagePrompt:
 - Create a clean, positive, healthy, happy, bright, and natural image
 - Focus on wellness, nature, food, lifestyle, or abstract concepts
-- Images can be ANYTHING healthy and positive - not limited to people (plants, food, nature, objects, abstract art, etc.)
-- If including people, do NOT specify race, ethnicity, or skin color - keep descriptions generic like "person" or "people"
+- NO HUMANS, NO PEOPLE, NO FACES, NO BODY PARTS, NO HANDS, NO SILHOUETTES OF PEOPLE
+- Only use objects, plants, food, nature, landscapes, abstract art, still life
 - NO organs, NO anatomy, NO medical scenes, NO surgery, NO blood
 - NO disgusting or scary content
 - NO logos, NO app icons, NO any icons, NO symbols
 - NO text, NO words, NO letters, NO writing, NO watermarks
 - NO mention of Instagram, Facebook, Twitter, TikTok, or any social media platform
 - The mood should be light, friendly, and have gentle wellness-style humor
-- Examples: "Fresh colorful fruits and vegetables on a wooden table with morning sunlight", "Peaceful zen garden with smooth stones and bamboo", "Cozy cup of herbal tea with honey and lemon on a rustic table", "Abstract watercolor of flowing energy in soft pastel colors"`;
+- Examples: "Fresh colorful fruits and vegetables on a wooden table with morning sunlight", "Peaceful zen garden with smooth stones and bamboo", "Cozy cup of herbal tea with honey and lemon on a rustic table", "Abstract watercolor of flowing energy in soft pastel colors", "Sunlit forest path with wildflowers"`;
 
   return prompt;
 }

@@ -45,15 +45,23 @@ export async function generateAiImage(
   try {
     // Use model ID directly in the endpoint URL
     const endpoint = `https://api.novita.ai/v3/${model}`;
-    
-    console.log(`[AI Image] Generating image with model: ${model}, endpoint: ${endpoint}`);
-    
-    const negativePrompt = "text, words, letters, writing, captions, watermark, logo, icon, symbol, organs, anatomy, medical, surgery, blood, gore, scary, disgusting, gross, disturbing, dark, depressing, sad, ugly, deformed, blurry, low quality, bad anatomy";
-    
+
+    console.log(
+      `[AI Image] Generating image with model: ${model}, endpoint: ${endpoint}`,
+    );
+
+    const negativePrompt = `
+    human, person, people, man, woman, child, face, faces, portrait, body, hands, fingers, arms, legs, feet, silhouette of person,
+    text, words, letters, writing, captions, watermark, logo, icon, symbol,
+    organs, anatomy, medical, surgery, blood, gore, scary, disgusting, gross,
+    disturbing, dark, depressing, sad, ugly, deformed, blurry, low quality,
+    anime, cartoon, illustration, 3d render
+    `;
+
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${novitaApiKey}`,
+        Authorization: `Bearer ${novitaApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -76,12 +84,16 @@ export async function generateAiImage(
     console.log(`[AI Image] Response:`, JSON.stringify(data).substring(0, 500));
 
     if (data.code && data.code !== 0) {
-      throw new Error(`Novita API error: ${data.msg || data.message || "Unknown error"}`);
+      throw new Error(
+        `Novita API error: ${data.msg || data.message || "Unknown error"}`,
+      );
     }
 
     // Handle async task response
     if (data.task_id) {
-      console.log(`[AI Image] Got task_id: ${data.task_id}, polling for result...`);
+      console.log(
+        `[AI Image] Got task_id: ${data.task_id}, polling for result...`,
+      );
       const imageUrl = await pollForResult(data.task_id, novitaApiKey);
       if (imageUrl) {
         if (campaignId) {
@@ -103,7 +115,9 @@ export async function generateAiImage(
     // Handle image_urls array format (seedream and other models)
     if (data.image_urls && data.image_urls.length > 0) {
       const imageUrl = data.image_urls[0];
-      console.log(`[AI Image] Got image from image_urls: ${imageUrl.substring(0, 100)}...`);
+      console.log(
+        `[AI Image] Got image from image_urls: ${imageUrl.substring(0, 100)}...`,
+      );
       if (campaignId) {
         await storage.createLog({
           campaignId,
@@ -122,7 +136,9 @@ export async function generateAiImage(
     // Handle direct image response (images array format)
     if (data.images && data.images.length > 0 && data.images[0].image_url) {
       const imageUrl = data.images[0].image_url;
-      console.log(`[AI Image] Got image from images array: ${imageUrl.substring(0, 100)}...`);
+      console.log(
+        `[AI Image] Got image from images array: ${imageUrl.substring(0, 100)}...`,
+      );
       if (campaignId) {
         await storage.createLog({
           campaignId,
@@ -138,7 +154,10 @@ export async function generateAiImage(
       };
     }
 
-    console.error("[AI Image] No image found in response:", JSON.stringify(data));
+    console.error(
+      "[AI Image] No image found in response:",
+      JSON.stringify(data),
+    );
     throw new Error("No image returned from Novita API");
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -157,18 +176,24 @@ export async function generateAiImage(
   }
 }
 
-async function pollForResult(taskId: string, apiKey: string): Promise<string | null> {
+async function pollForResult(
+  taskId: string,
+  apiKey: string,
+): Promise<string | null> {
   const maxAttempts = 60;
   const pollInterval = 2000;
 
   for (let i = 0; i < maxAttempts; i++) {
-    await new Promise(resolve => setTimeout(resolve, pollInterval));
+    await new Promise((resolve) => setTimeout(resolve, pollInterval));
 
-    const response = await fetch(`https://api.novita.ai/v3/async/task-result?task_id=${taskId}`, {
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
+    const response = await fetch(
+      `https://api.novita.ai/v3/async/task-result?task_id=${taskId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
       },
-    });
+    );
 
     if (!response.ok) {
       continue;

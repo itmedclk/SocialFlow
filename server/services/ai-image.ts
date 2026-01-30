@@ -48,6 +48,8 @@ export async function generateAiImage(
     
     console.log(`[AI Image] Generating image with model: ${model}, endpoint: ${endpoint}`);
     
+    const negativePrompt = "text, words, letters, writing, captions, watermark, logo, icon, symbol, organs, anatomy, medical, surgery, blood, gore, scary, disgusting, gross, disturbing, dark, depressing, sad, ugly, deformed, blurry, low quality, bad anatomy";
+    
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -56,6 +58,7 @@ export async function generateAiImage(
       },
       body: JSON.stringify({
         prompt: prompt,
+        negative_prompt: negativePrompt,
         model: model,
         size: "1024x1024",
         guidance_scale: 7.5,

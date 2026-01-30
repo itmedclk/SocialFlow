@@ -150,17 +150,18 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
       }
     }
 
-    // If auto-publish is enabled, use the target scheduled time or calculate from cron
-    // Otherwise, set to draft for manual review
+    // Only auto-schedule if:
+    // 1. Campaign is active
+    // 2. Auto-publish is enabled
+    // 3. A target scheduled time was explicitly passed (meaning this is from the scheduler, not manual)
+    // Manual generation from review page should NOT auto-schedule - leave as draft
     let newStatus: "draft" | "scheduled" = "draft";
     let scheduledFor: Date | null = null;
 
-    if (campaign.autoPublish) {
-      // Use explicitly passed target time, or calculate from cron
-      scheduledFor = targetScheduledTime || getNextScheduledTime(campaign);
-      if (scheduledFor) {
-        newStatus = "scheduled";
-      }
+    if (campaign.isActive && campaign.autoPublish && targetScheduledTime) {
+      // Only use explicitly passed target time from scheduler
+      scheduledFor = targetScheduledTime;
+      newStatus = "scheduled";
     }
 
     await storage.updatePost(post.id, {
@@ -173,21 +174,13 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
       aiModel: modelName,
     }, campaign.userId);
 
-    if (campaign.autoPublish && scheduledFor) {
+    if (scheduledFor) {
       await storage.createLog({
         campaignId: campaign.id,
         postId: post.id,
         userId: campaign.userId,
         level: "info",
         message: `Post auto-approved and scheduled for ${scheduledFor.toISOString()}`,
-      });
-    } else if (campaign.autoPublish && !scheduledFor) {
-      await storage.createLog({
-        campaignId: campaign.id,
-        postId: post.id,
-        userId: campaign.userId,
-        level: "warning",
-        message: "Auto-publish enabled but no valid schedule found - left as draft for manual scheduling",
       });
     }
 

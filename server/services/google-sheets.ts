@@ -4,6 +4,42 @@ import { storage } from "../storage";
 
 const DEFAULT_SHEET_NAME = "Posts";
 
+async function getTargetSheetName(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+): Promise<string> {
+  const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+  const existingSheets = spreadsheet.data.sheets || [];
+  const sheetTitles = existingSheets
+    .map((sheet) => sheet.properties?.title)
+    .filter((title): title is string => Boolean(title));
+
+  if (sheetTitles.includes(DEFAULT_SHEET_NAME)) {
+    return DEFAULT_SHEET_NAME;
+  }
+
+  if (sheetTitles.length > 0) {
+    return sheetTitles[0];
+  }
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          addSheet: {
+            properties: {
+              title: DEFAULT_SHEET_NAME,
+            },
+          },
+        },
+      ],
+    },
+  });
+
+  return DEFAULT_SHEET_NAME;
+}
+
 export async function appendPostToSheet(
   post: Post,
   campaign: Campaign,
@@ -49,9 +85,14 @@ export async function appendPostToSheet(
     post.imageCredit || "",
   ];
 
+  const targetSheet = await getTargetSheetName(
+    sheets,
+    settings.googleSpreadsheetId,
+  );
+
   await sheets.spreadsheets.values.append({
     spreadsheetId: settings.googleSpreadsheetId,
-    range: `${DEFAULT_SHEET_NAME}!A1`,
+    range: `${targetSheet}!A1`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: {

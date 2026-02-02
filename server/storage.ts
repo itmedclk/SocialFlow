@@ -24,6 +24,7 @@ export interface IStorage {
   getScheduledPosts(userId?: string): Promise<Post[]>;
   getDraftPosts(campaignId?: number, userId?: string): Promise<Post[]>;
   deleteDraftPostsByCampaign(campaignId: number, userId?: string): Promise<number>;
+  deleteAllPostsByCampaign(campaignId: number, userId?: string): Promise<number>;
   deleteOldPublishedPosts(daysOld: number): Promise<number>;
   
   // Log methods (with userId filtering)
@@ -258,6 +259,28 @@ export class DatabaseStorage implements IStorage {
     }
 
     return drafts.length;
+  }
+
+  async deleteAllPostsByCampaign(campaignId: number, userId?: string): Promise<number> {
+    const allPosts = userId
+      ? await db
+          .select({ id: posts.id })
+          .from(posts)
+          .where(and(eq(posts.campaignId, campaignId), eq(posts.userId, userId)))
+      : await db
+          .select({ id: posts.id })
+          .from(posts)
+          .where(eq(posts.campaignId, campaignId));
+
+    if (allPosts.length === 0) {
+      return 0;
+    }
+
+    for (const post of allPosts) {
+      await db.delete(posts).where(eq(posts.id, post.id));
+    }
+
+    return allPosts.length;
   }
 
   async deleteOldPublishedPosts(daysOld: number): Promise<number> {

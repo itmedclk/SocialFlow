@@ -1022,5 +1022,39 @@ export async function registerRoutes(
     },
   );
 
+  // Endpoint to delete ALL posts for a campaign (authenticated)
+  app.delete(
+    "/api/campaigns/:id/posts/all",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "Invalid campaign ID" });
+        }
+
+        const campaign = await storage.getCampaign(id, userId);
+        if (!campaign) {
+          return res.status(404).json({ error: "Campaign not found" });
+        }
+
+        const deletedCount = await storage.deleteAllPostsByCampaign(id, userId);
+        
+        await storage.createLog({
+          campaignId: id,
+          userId,
+          level: "warning",
+          message: `Cleared ALL ${deletedCount} posts`,
+        });
+
+        res.json({ success: true, deletedCount });
+      } catch (error) {
+        console.error("Error deleting all posts:", error);
+        res.status(500).json({ error: "Failed to delete all posts" });
+      }
+    },
+  );
+
   return httpServer;
 }

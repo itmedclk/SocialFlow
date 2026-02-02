@@ -579,7 +579,7 @@ export default function Review() {
 
     setClearingArticles(true);
     try {
-      const response = await fetch(`/api/campaigns/${selectedCampaign}/posts/drafts`, {
+      const response = await fetch(`/api/campaigns/${selectedCampaign}/posts/all`, {
         method: "DELETE",
       });
 
@@ -591,7 +591,7 @@ export default function Review() {
 
       toast({
         title: "Articles Cleared",
-        description: `Cleared ${result.deletedCount} draft article(s) from this campaign.`,
+        description: `Cleared ${result.deletedCount} article(s) from this campaign.`,
       });
 
       fetchPosts(parseInt(selectedCampaign));

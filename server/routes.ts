@@ -18,7 +18,11 @@ import {
   processDraftPosts,
 } from "./services/pipeline";
 import { runNow } from "./services/scheduler";
-import { formatInTimeZone, DEFAULT_TIMEZONE, resolveTimeZone } from "./services/time";
+import {
+  formatInTimeZone,
+  DEFAULT_TIMEZONE,
+  resolveTimeZone,
+} from "./services/time";
 import { isAuthenticated } from "./replit_integrations/auth";
 import { google } from "googleapis";
 
@@ -31,7 +35,7 @@ export async function registerRoutes(
 ): Promise<Server> {
   const googleRedirectUri =
     process.env.GOOGLE_OAUTH_REDIRECT_URI ||
-    "https://social-flow-test.replit.app/api/google/oauth/callback";
+    "https://social-flow-v-1.replit.app/api/google/oauth/callback";
 
   const buildGoogleClient = (settings: any) => {
     if (!settings?.googleClientId || !settings?.googleClientSecret) {
@@ -50,9 +54,13 @@ export async function registerRoutes(
   app.get("/api/campaigns", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      console.log(`[DEBUG] GET /api/campaigns - userId: ${userId}, type: ${typeof userId}`);
+      console.log(
+        `[DEBUG] GET /api/campaigns - userId: ${userId}, type: ${typeof userId}`,
+      );
       const campaigns = await storage.getAllCampaigns(userId);
-      console.log(`[DEBUG] GET /api/campaigns - found ${campaigns.length} campaigns for user ${userId}`);
+      console.log(
+        `[DEBUG] GET /api/campaigns - found ${campaigns.length} campaigns for user ${userId}`,
+      );
       res.json(campaigns);
     } catch (error) {
       console.error("Error fetching campaigns:", error);
@@ -239,18 +247,21 @@ export async function registerRoutes(
 
       // First try to get post by userId
       let post = await storage.getPost(id, userId);
-      
+
       // If not found, check if user owns the campaign this post belongs to
       if (!post) {
         const anyPost = await storage.getPost(id);
         if (anyPost && anyPost.campaignId) {
-          const campaign = await storage.getCampaign(anyPost.campaignId, userId);
+          const campaign = await storage.getCampaign(
+            anyPost.campaignId,
+            userId,
+          );
           if (campaign) {
             post = anyPost; // User owns the campaign, allow access
           }
         }
       }
-      
+
       if (!post) {
         return res.status(404).json({ error: "Post not found" });
       }
@@ -498,7 +509,7 @@ export async function registerRoutes(
 
         // Get override prompt from request body
         const { prompt: overridePrompt } = req.body || {};
-        
+
         await processNewPost(post, campaign, overridePrompt);
         const updatedPost = await storage.getPost(id, userId);
 
@@ -648,11 +659,9 @@ export async function registerRoutes(
       const { action, campaignId } = req.body;
 
       if (!action || !["fetch", "process", "publish"].includes(action)) {
-        return res
-          .status(400)
-          .json({
-            error: "Invalid action. Must be: fetch, process, or publish",
-          });
+        return res.status(400).json({
+          error: "Invalid action. Must be: fetch, process, or publish",
+        });
       }
 
       const result = await runNow(action, campaignId, userId);
@@ -718,7 +727,9 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       console.log(`[DEBUG] GET /api/settings - userId: ${userId}`);
       const settings = await storage.getUserSettings(userId);
-      console.log(`[DEBUG] GET /api/settings - settings found: ${settings ? 'yes' : 'no'}`);
+      console.log(
+        `[DEBUG] GET /api/settings - settings found: ${settings ? "yes" : "no"}`,
+      );
 
       if (!settings) {
         return res.json({
@@ -760,24 +771,33 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       console.log(`[DEBUG] PUT /api/settings - userId: ${userId}`);
       console.log(`[DEBUG] PUT /api/settings - body:`, req.body);
-      
+
       // Ensure userId is present in the update data
       const cleanedData: any = { userId };
-      
+
       // Explicitly pick allowed fields from request body
       const allowedFields = [
-        'aiApiKey', 'aiBaseUrl', 'aiModel', 'globalAiPrompt',
-        'postlyApiKey', 'postlyWorkspaceId', 'unsplashAccessKey',
-        'pexelsApiKey', 'aiImageModel', 'novitaApiKey',
-        'googleClientId', 'googleClientSecret', 'googleSpreadsheetId'
+        "aiApiKey",
+        "aiBaseUrl",
+        "aiModel",
+        "globalAiPrompt",
+        "postlyApiKey",
+        "postlyWorkspaceId",
+        "unsplashAccessKey",
+        "pexelsApiKey",
+        "aiImageModel",
+        "novitaApiKey",
+        "googleClientId",
+        "googleClientSecret",
+        "googleSpreadsheetId",
       ];
 
-      allowedFields.forEach(field => {
+      allowedFields.forEach((field) => {
         if (req.body[field] !== undefined) {
           cleanedData[field] = req.body[field] === "" ? null : req.body[field];
         }
       });
-      
+
       console.log(`[DEBUG] PUT /api/settings - cleanedData:`, cleanedData);
       const settings = await storage.upsertUserSettings(cleanedData);
 
@@ -806,7 +826,8 @@ export async function registerRoutes(
       const settings = await storage.getUserSettings(userId);
       if (!settings?.googleClientId || !settings?.googleClientSecret) {
         return res.status(400).json({
-          error: "Google Client ID/Secret must be saved in settings before connecting.",
+          error:
+            "Google Client ID/Secret must be saved in settings before connecting.",
         });
       }
 
@@ -1029,7 +1050,9 @@ export async function registerRoutes(
         }
 
         if (!post.generatedCaption) {
-          return res.status(400).json({ error: "Caption must be generated first" });
+          return res
+            .status(400)
+            .json({ error: "Caption must be generated first" });
         }
 
         const campaign = await storage.getCampaign(post.campaignId, userId);
@@ -1039,7 +1062,9 @@ export async function registerRoutes(
 
         const userSettings = await storage.getUserSettings(userId);
         if (!userSettings?.novitaApiKey) {
-          return res.status(400).json({ error: "Novita API key not configured in settings" });
+          return res
+            .status(400)
+            .json({ error: "Novita API key not configured in settings" });
         }
 
         const { generateAiImage } = await import("./services/ai-image");
@@ -1055,10 +1080,14 @@ export async function registerRoutes(
         );
 
         if (imageResult) {
-          await storage.updatePost(id, { 
-            imageUrl: imageResult.url, 
-            imageCredit: imageResult.credit 
-          }, userId);
+          await storage.updatePost(
+            id,
+            {
+              imageUrl: imageResult.url,
+              imageCredit: imageResult.credit,
+            },
+            userId,
+          );
           const updatedPost = await storage.getPost(id, userId);
           res.json({ success: true, post: updatedPost });
         } else {
@@ -1066,7 +1095,8 @@ export async function registerRoutes(
         }
       } catch (error) {
         console.error("Error generating AI image:", error);
-        const errorMessage = error instanceof Error ? error.message : "Failed to generate image";
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to generate image";
         res.status(500).json({ error: errorMessage });
       }
     },
@@ -1089,8 +1119,11 @@ export async function registerRoutes(
           return res.status(404).json({ error: "Campaign not found" });
         }
 
-        const deletedCount = await storage.deleteDraftPostsByCampaign(id, userId);
-        
+        const deletedCount = await storage.deleteDraftPostsByCampaign(
+          id,
+          userId,
+        );
+
         await storage.createLog({
           campaignId: id,
           userId,
@@ -1124,7 +1157,7 @@ export async function registerRoutes(
         }
 
         const deletedCount = await storage.deleteAllPostsByCampaign(id, userId);
-        
+
         await storage.createLog({
           campaignId: id,
           userId,

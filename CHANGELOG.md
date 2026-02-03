@@ -123,3 +123,9 @@ All notable changes to SocialFlow Automation are documented in this file.
 #### AI Image Prompt Tuning
 - Default AI image prompts now explicitly avoid human subjects to reduce unwanted people in generated images
 - Updated imagePrompt guidance to emphasize object-only still life and nature-only landscapes
+
+#### Navigation Fixes
+- Sidebar Post History tab now links to `/post-history` instead of the deprecated `/pipeline`
+
+#### Static Asset Serving Fix
+- Production static assets now serve from `dist/public` to prevent 500s on `/` and `/favicon.ico`

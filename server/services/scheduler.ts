@@ -160,9 +160,9 @@ async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
   const timeUntilNext = (nextScheduledTime.getTime() - now.getTime()) / (1000 * 60); // in minutes
 
   // Only prepare posts within the 2-hour window
-  // If we are very close to the time (e.g. within 5 mins) or slightly past it (within 5 mins)
+  // If we are very close to the time (e.g. within 30 mins) or slightly past it (within 30 mins)
   // we should still try to schedule if nothing is there.
-  if (timeUntilNext > PREPARATION_WINDOW_MINUTES || timeUntilNext < -30) {
+  if (timeUntilNext > PREPARATION_WINDOW_MINUTES || timeUntilNext < -60) {
     return false;
   }
 
@@ -171,9 +171,9 @@ async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
   const hasScheduledPost = posts.some((post) => {
     if (post.status !== "scheduled" || !post.scheduledFor) return false;
     const postTime = new Date(post.scheduledFor);
-    // Check if a post is scheduled within 5 minutes of the next slot
+    // Check if a post is scheduled within 30 minutes of the next slot
     const timeDiff = Math.abs(postTime.getTime() - nextScheduledTime.getTime()) / (1000 * 60);
-    return timeDiff < 10; // Increased tolerance to 10 minutes
+    return timeDiff < 30; // Increased tolerance to 30 minutes to match preparation window logic
   });
 
   if (hasScheduledPost) {

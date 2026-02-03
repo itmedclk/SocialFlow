@@ -102,9 +102,10 @@ app.use((req, res, next) => {
     log(`Serving on port ${port}`);
 
     // Start background scheduler for RSS fetching, AI processing, and publishing
-    // startScheduler();
-    if (process.env.REPLIT_DEPLOYMENT === "production") {
-      startScheduler();
-    }
+    // Scheduler now runs in both dev and production with built-in safeguards:
+    // - 60 second startup delay (cold start protection)
+    // - 4 minute minimum gap between cycles (prevents rapid fire on restart)
+    // - Checks for recently published posts (prevents double-posting)
+    startScheduler();
   });
 })();

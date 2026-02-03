@@ -53,8 +53,12 @@ Preferred communication style: Simple, everyday language.
 - **Smart Scheduler**: `server/services/scheduler.ts` runs efficient background jobs:
   - Single check cycle every 5 minutes
   - RSS fetch only once per hour per campaign
-  - Prepares only posts scheduled within next 30 minutes
+  - 2-hour preparation window for upcoming posts
   - Maximum 2 posts prepared per cycle for scalability
+  - **Cold-start protection**: 60-second startup delay prevents immediate posting on server wake
+  - **Rapid-restart protection**: 4-minute minimum gap between scheduler cycles
+  - **Duplicate prevention**: Checks both scheduled AND recently published posts (30-min window)
+  - Runs in both development and production environments with same safeguards
 
 ### Key Design Decisions
 1. **Shared Schema**: TypeScript types are derived from Drizzle schema, ensuring type safety between frontend and backend

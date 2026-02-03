@@ -6,32 +6,27 @@ import {
   processNextPosts,
   processNewPost,
 } from "./pipeline";
-import {
-  campaigns,
-  posts,
-  logs,
-  userSettings,
-  type Campaign,
-  type InsertCampaign,
-  type Post,
-  type InsertPost,
-  type Log,
-  type InsertLog,
-  type UserSettings,
-  type InsertUserSettings,
-} from "@shared/schema";
+import type { Campaign } from "../../shared/schema";
 import { CronExpressionParser } from "cron-parser";
 
 let mainLoopId: NodeJS.Timeout | null = null;
 let lastCleanupDate: string | null = null;
+let schedulerStartTime: Date | null = null;
+let lastSchedulerCycleTime: Date | null = null;
 
-const MAIN_LOOP_INTERVAL = 5 * 60 * 1000;
+const MAIN_LOOP_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const STARTUP_DELAY = 60 * 1000; // Wait 60 seconds after startup before first cycle
+const MINIMUM_CYCLE_GAP = 4 * 60 * 1000; // Minimum 4 minutes between cycles (prevents rapid fire on restart)
 const PREPARATION_WINDOW_MINUTES = 120; // Prepare posts 2 hours before scheduled time
 const MAX_POSTS_TO_PREPARE = 2;
 const OLD_POST_DAYS = 30; // Delete published posts older than 30 days
 
 export function startScheduler(): void {
-  console.log("[Scheduler] Starting smart scheduler...");
+  schedulerStartTime = new Date();
+  const isProduction = process.env.REPLIT_DEPLOYMENT === "production";
+  const mode = isProduction ? "PRODUCTION" : "DEVELOPMENT";
+  
+  console.log(`[Scheduler] Starting smart scheduler in ${mode} mode...`);
 
   mainLoopId = setInterval(async () => {
     try {
@@ -41,15 +36,15 @@ export function startScheduler(): void {
     }
   }, MAIN_LOOP_INTERVAL);
 
-  setTimeout(() => runSchedulerCycle(), 10000);
+  // Delay first cycle to prevent immediate action on cold start/restart
+  console.log(`[Scheduler] Waiting ${STARTUP_DELAY / 1000} seconds before first cycle (cold start protection)...`);
+  setTimeout(() => runSchedulerCycle(), STARTUP_DELAY);
 
   console.log("[Scheduler] Smart scheduler started");
-  console.log(
-    `  - Check interval: every ${MAIN_LOOP_INTERVAL / 60000} minutes`,
-  );
-  console.log(
-    `  - Preparation window: ${PREPARATION_WINDOW_MINUTES} minutes before scheduled time`,
-  );
+  console.log(`  - Mode: ${mode}`);
+  console.log(`  - Check interval: every ${MAIN_LOOP_INTERVAL / 60000} minutes`);
+  console.log(`  - Startup delay: ${STARTUP_DELAY / 1000} seconds`);
+  console.log(`  - Preparation window: ${PREPARATION_WINDOW_MINUTES} minutes before scheduled time`);
   console.log(`  - Max posts to prepare per cycle: ${MAX_POSTS_TO_PREPARE}`);
 }
 
@@ -74,6 +69,19 @@ function getNextScheduledTime(campaign: Campaign): Date | null {
 
 async function runSchedulerCycle(): Promise<void> {
   const now = new Date();
+  
+  // Prevent running too soon after last cycle (handles rapid restarts)
+  if (lastSchedulerCycleTime) {
+    const timeSinceLastCycle = now.getTime() - lastSchedulerCycleTime.getTime();
+    if (timeSinceLastCycle < MINIMUM_CYCLE_GAP) {
+      console.log(`[Scheduler] Skipping cycle - only ${Math.round(timeSinceLastCycle / 1000)}s since last cycle (minimum: ${MINIMUM_CYCLE_GAP / 1000}s)`);
+      return;
+    }
+  }
+  
+  lastSchedulerCycleTime = now;
+  console.log(`[Scheduler] Running cycle at ${now.toISOString()}`);
+  
   const campaigns = await storage.getActiveCampaigns();
 
   for (const campaign of campaigns) {
@@ -89,7 +97,7 @@ async function runSchedulerCycle(): Promise<void> {
       if (shouldFetchRSS) {
         console.log(`[Scheduler] Fetching RSS for campaign ${campaign.id}...`);
         try {
-          await processCampaignFeeds(campaign.id, campaign.userId);
+          await processCampaignFeeds(campaign.id, campaign.userId ?? undefined);
         } catch (error) {
           console.error(
             `[Scheduler] RSS fetch error for campaign ${campaign.id}:`,
@@ -166,19 +174,33 @@ async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
     return false;
   }
 
-  // Check if there's already a post scheduled for this time slot
-  const posts = await storage.getPostsByCampaign(campaign.id, 50, campaign.userId);
-  const hasScheduledPost = posts.some((post) => {
+  // Check if there's already a post scheduled OR recently published for this time slot
+  const allPosts = await storage.getPostsByCampaign(campaign.id, 100, campaign.userId ?? undefined);
+  
+  // Check for scheduled posts
+  const hasScheduledPost = allPosts.some((post) => {
     if (post.status !== "scheduled" || !post.scheduledFor) return false;
     const postTime = new Date(post.scheduledFor);
-    // Check if a post is scheduled within 30 minutes of the next slot
     const timeDiff = Math.abs(postTime.getTime() - nextScheduledTime.getTime()) / (1000 * 60);
-    return timeDiff < 30; // Increased tolerance to 30 minutes to match preparation window logic
+    return timeDiff < 30;
   });
 
   if (hasScheduledPost) {
-    // console.log(`[Scheduler] Post already scheduled for ${nextScheduledTime.toISOString()}`);
     return false; // Already have a post scheduled for this slot
+  }
+  
+  // Check for recently published posts (prevents double-posting on wake)
+  const hasRecentlyPublished = allPosts.some((post) => {
+    if (post.status !== "posted" || !post.postedAt) return false;
+    const postedTime = new Date(post.postedAt);
+    // If a post was published within 30 minutes of the target slot, skip
+    const timeDiff = Math.abs(postedTime.getTime() - nextScheduledTime.getTime()) / (1000 * 60);
+    return timeDiff < 30;
+  });
+
+  if (hasRecentlyPublished) {
+    console.log(`[Scheduler] Post already published for slot near ${nextScheduledTime.toISOString()}, skipping`);
+    return false; // Already published a post for this slot
   }
 
   // No post scheduled for this time slot - find a draft to schedule
@@ -186,7 +208,7 @@ async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
   
   try {
     // Step 1: Check for existing drafts WITH captions first (manually prepared)
-    const currentPosts = await storage.getPostsByCampaign(campaign.id, 50, campaign.userId);
+    const currentPosts = await storage.getPostsByCampaign(campaign.id, 50, campaign.userId ?? undefined);
     const draftsWithCaption = currentPosts
       .filter((post) => post.status === "draft" && post.generatedCaption)
       .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
@@ -197,7 +219,7 @@ async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
       await storage.updatePost(oldestDraft.id, {
         status: "scheduled",
         scheduledFor: nextScheduledTime,
-      }, campaign.userId);
+      }, campaign.userId ?? undefined);
       await storage.createLog({
         campaignId: campaign.id,
         postId: oldestDraft.id,
@@ -225,12 +247,12 @@ async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
     // Step 3: No drafts at all - fetch RSS to get new articles
     console.log(`[Scheduler] No drafts found, fetching RSS for campaign ${campaign.id}...`);
     try {
-      const rssResult = await processCampaignFeeds(campaign.id, campaign.userId, nextScheduledTime);
+      const rssResult = await processCampaignFeeds(campaign.id, campaign.userId ?? undefined, nextScheduledTime);
       if (rssResult.new > 0) {
         console.log(`[Scheduler] Found ${rssResult.new} new articles from RSS`);
         
         // Refresh posts list to get newly created drafts
-        const refreshedPosts = await storage.getPostsByCampaign(campaign.id, 50, campaign.userId);
+        const refreshedPosts = await storage.getPostsByCampaign(campaign.id, 50, campaign.userId ?? undefined);
         const newDrafts = refreshedPosts
           .filter((post) => post.status === "draft" && !post.generatedCaption)
           .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
@@ -302,10 +324,10 @@ export async function runNow(
       if (campaignId) {
         return await processDraftPosts(campaignId, userId || undefined);
       } else {
-        const campaigns = await storage.getActiveCampaigns(userId || undefined);
-        const results = [];
-        for (const campaign of campaigns) {
-          const result = await processDraftPosts(campaign.id, campaign.userId);
+        const allCampaigns = await storage.getActiveCampaigns(userId || undefined);
+        const results: Array<{ campaignId: number; result: { processed: number; success: number; failed: number } }> = [];
+        for (const campaign of allCampaigns) {
+          const result = await processDraftPosts(campaign.id, campaign.userId ?? undefined);
           results.push({
             campaignId: campaign.id,
             result,

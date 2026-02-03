@@ -6,7 +6,20 @@ import {
   processNextPosts,
   processNewPost,
 } from "./pipeline";
-import type { Campaign} from "@shared/schema"
+import {
+  campaigns,
+  posts,
+  logs,
+  userSettings,
+  type Campaign,
+  type InsertCampaign,
+  type Post,
+  type InsertPost,
+  type Log,
+  type InsertLog,
+  type UserSettings,
+  type InsertUserSettings,
+} from "@shared/schema";
 import { CronExpressionParser } from "cron-parser";
 
 let mainLoopId: NodeJS.Timeout | null = null;
@@ -47,7 +60,12 @@ function getNextScheduledTime(campaign: Campaign): Date | null {
     const timezone = campaign.scheduleTimezone || "America/Los_Angeles";
     const expression = CronExpressionParser.parse(campaign.scheduleCron, { tz: timezone });
     const next = expression.next();
-    return next.toDate();
+    const nextDate = next.toDate();
+    
+    // LOG: Always log the next scheduled time for debugging
+    console.log(`[Scheduler] Campaign ${campaign.id} ("${campaign.name}") next scheduled for: ${nextDate.toISOString()} (TZ: ${timezone})`);
+    
+    return nextDate;
   } catch (error) {
     console.error(`[Scheduler] Failed to parse cron expression: ${campaign.scheduleCron}`, error);
     return null;
@@ -142,7 +160,9 @@ async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
   const timeUntilNext = (nextScheduledTime.getTime() - now.getTime()) / (1000 * 60); // in minutes
 
   // Only prepare posts within the 2-hour window
-  if (timeUntilNext > PREPARATION_WINDOW_MINUTES || timeUntilNext < 0) {
+  // If we are very close to the time (e.g. within 5 mins) or slightly past it (within 5 mins)
+  // we should still try to schedule if nothing is there.
+  if (timeUntilNext > PREPARATION_WINDOW_MINUTES || timeUntilNext < -30) {
     return false;
   }
 
@@ -153,10 +173,11 @@ async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
     const postTime = new Date(post.scheduledFor);
     // Check if a post is scheduled within 5 minutes of the next slot
     const timeDiff = Math.abs(postTime.getTime() - nextScheduledTime.getTime()) / (1000 * 60);
-    return timeDiff < 5;
+    return timeDiff < 10; // Increased tolerance to 10 minutes
   });
 
   if (hasScheduledPost) {
+    // console.log(`[Scheduler] Post already scheduled for ${nextScheduledTime.toISOString()}`);
     return false; // Already have a post scheduled for this slot
   }
 
@@ -279,14 +300,15 @@ export async function runNow(
 
     case "process":
       if (campaignId) {
-        return await processDraftPosts(campaignId, userId);
+        return await processDraftPosts(campaignId, userId || undefined);
       } else {
-        const campaigns = await storage.getActiveCampaigns(userId);
+        const campaigns = await storage.getActiveCampaigns(userId || undefined);
         const results = [];
         for (const campaign of campaigns) {
+          const result = await processDraftPosts(campaign.id, campaign.userId);
           results.push({
             campaignId: campaign.id,
-            result: await processDraftPosts(campaign.id, campaign.userId),
+            result,
           });
         }
         return results;

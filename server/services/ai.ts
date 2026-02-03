@@ -223,7 +223,7 @@ function buildSystemPrompt(
 ): string {
   const defaultPrompt = `You are a social media content creator. Create engaging, concise social media posts based on the article provided. 
 Keep the tone professional yet approachable. Include relevant hashtags. 
-The post should be compelling and encourage engagement.
+The post should be compelling and encourage engagement.NEVER decide hashtag language yourself — follow the campaign prompt exactly.
 IMPORTANT: Never use "Thread x/x" or numbered thread formats in the output. Create a single cohesive post.`;
 
   const customPrompt = overridePrompt?.trim() || campaign.aiPrompt?.trim();

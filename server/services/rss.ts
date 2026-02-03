@@ -4,11 +4,43 @@ import { type InsertPost } from "@shared/schema";
 import { processNewPost } from "./pipeline";
 
 const parser = new Parser({
-  timeout: 10000,
-  headers: {
-    "User-Agent": "SocialFlow/1.0 RSS Reader",
-  },
+  timeout: 15000,
 });
+
+const DEFAULT_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+  Accept: "application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.7",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Cache-Control": "no-cache",
+  Pragma: "no-cache",
+};
+
+async function fetchFeedXml(url: string): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetch(url, {
+      redirect: "follow",
+      headers: DEFAULT_HEADERS,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("xml") && !contentType.includes("rss")) {
+      throw new Error(`Unexpected content-type: ${contentType || "unknown"}`);
+    }
+
+    return await response.text();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 export interface ParsedArticle {
   title: string;
@@ -21,7 +53,8 @@ export interface ParsedArticle {
 
 export async function fetchFeed(url: string): Promise<ParsedArticle[]> {
   try {
-    const feed = await parser.parseURL(url);
+    const xml = await fetchFeedXml(url);
+    const feed = await parser.parseString(xml);
 
     return feed.items.map((item) => parseArticle(item));
   } catch (error) {

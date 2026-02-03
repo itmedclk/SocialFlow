@@ -312,10 +312,13 @@ export default function Review() {
         },
       );
       const result = await response.json();
+      const errorDetails = result.errors?.length
+        ? ` (${result.errors.join("; ")})`
+        : "";
 
       toast({
         title: "Fetch Complete",
-        description: result.message,
+        description: `${result.message}${errorDetails}`,
       });
 
       const campaignId = activeCampaign?.id;
@@ -579,6 +582,7 @@ export default function Review() {
     try {
       const response = await fetch(`/api/posts/${currentPost.id}/generate-image`, {
         method: "POST",
+        credentials: "include",
       });
 
       const result = await response.json();
@@ -637,6 +641,7 @@ export default function Review() {
     try {
       const response = await fetch(`/api/campaigns/${selectedCampaign}/posts/all`, {
         method: "DELETE",
+        credentials: "include",
       });
 
       const result = await response.json();
@@ -692,7 +697,6 @@ export default function Review() {
         setCaption(result.post.generatedCaption || "");
       }
 
-      //await fetchPosts(activeCampaign?.id);
       // BUGFIX: Update the posts array with the new caption
       setPosts((prev) =>
         prev.map((p) =>

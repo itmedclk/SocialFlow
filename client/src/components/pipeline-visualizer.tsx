@@ -105,7 +105,7 @@ export function PipelineVisualizer({ isRunning, onComplete }: PipelineVisualizer
 
   const fetchCampaigns = async () => {
     try {
-      const response = await fetch('/api/campaigns');
+      const response = await fetch('/api/campaigns', { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
         setCampaigns(data);
@@ -121,7 +121,7 @@ export function PipelineVisualizer({ isRunning, onComplete }: PipelineVisualizer
       const url = selectedCampaign !== "all" 
         ? `/api/posts?campaignId=${selectedCampaign}` 
         : '/api/posts';
-      const response = await fetch(url);
+      const response = await fetch(url, { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
         setPosts(data);

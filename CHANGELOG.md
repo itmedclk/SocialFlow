@@ -104,3 +104,7 @@ All notable changes to SocialFlow Automation are documented in this file.
 - Scheduler, pipeline, and approval routes now resolve timezones before cron parsing/log formatting
 - Review page message scheduling now validates timezone and falls back to America/Los_Angeles
 - Pipeline Status mock page now delegates to the Post History view so UI reflects real schedule times
+
+#### Campaigns + Post History Fixes
+- Added auth credentials to campaign detail and pipeline visualizer fetches so campaigns load consistently
+- Updated post history API to return all posts across the user's campaigns (not just drafts)

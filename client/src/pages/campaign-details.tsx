@@ -25,7 +25,7 @@ export default function CampaignDetails() {
 
   const fetchCampaign = async () => {
     try {
-      const response = await fetch(`/api/campaigns/${id}`);
+      const response = await fetch(`/api/campaigns/${id}`, { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
         setCampaign(data);
@@ -38,7 +38,7 @@ export default function CampaignDetails() {
   const fetchPosts = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/posts?campaignId=${id}`);
+      const response = await fetch(`/api/posts?campaignId=${id}`, { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
         setPosts(data);

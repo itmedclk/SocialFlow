@@ -212,7 +212,14 @@ export async function registerRoutes(
         // Use a higher limit to ensure all posts including older published ones are returned
         posts = await storage.getPostsByCampaign(campaignId, 500);
       } else {
-        posts = await storage.getDraftPosts(undefined, userId);
+        // For post history, return all posts across the user's campaigns
+        const campaigns = await storage.getAllCampaigns(userId);
+        const postsByCampaign = await Promise.all(
+          campaigns.map((campaign) =>
+            storage.getPostsByCampaign(campaign.id, 500, userId),
+          ),
+        );
+        posts = postsByCampaign.flat();
       }
 
       res.json(posts);

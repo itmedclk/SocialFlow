@@ -89,6 +89,7 @@ export class DatabaseStorage implements IStorage {
   async upsertUserSettings(
     settings: InsertUserSettings,
   ): Promise<UserSettings> {
+    console.log(`[Storage] Upserting settings for userId: "${settings.userId}"`, settings);
     const [result] = await db
       .insert(userSettings)
       .values(settings)

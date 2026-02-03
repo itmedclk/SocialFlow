@@ -743,6 +743,8 @@ export async function registerRoutes(
   app.put("/api/settings", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      console.log(`[DEBUG] PUT /api/settings - userId: ${userId}`);
+      console.log(`[DEBUG] PUT /api/settings - body:`, req.body);
       const existingSettings = await storage.getUserSettings(userId);
 
       const updateData: any = { userId };

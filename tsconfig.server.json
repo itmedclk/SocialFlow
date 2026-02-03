@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["server/**/*"],
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "types": ["node"],
+    "lib": ["ES2022"],
+    "noEmit": true
+  }
+}

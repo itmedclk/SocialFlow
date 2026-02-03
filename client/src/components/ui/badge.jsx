@@ -1,0 +1,43 @@
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
+import * as React from "react";
+import { cva } from "class-variance-authority";
+import { cn } from "@/lib/utils";
+var badgeVariants = cva(
+// @replit
+// Whitespace-nowrap: Badges should never wrap.
+"whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" +
+    " hover-elevate ", {
+    variants: {
+        variant: {
+            default: 
+            // @replit shadow-xs instead of shadow, no hover because we use hover-elevate
+            "border-transparent bg-primary text-primary-foreground shadow-xs",
+            secondary: 
+            // @replit no hover because we use hover-elevate
+            "border-transparent bg-secondary text-secondary-foreground",
+            destructive: 
+            // @replit shadow-xs instead of shadow, no hover because we use hover-elevate
+            "border-transparent bg-destructive text-destructive-foreground shadow-xs",
+            // @replit shadow-xs" - use badge outline variable
+            outline: "text-foreground border [border-color:var(--badge-outline)]",
+        },
+    },
+    defaultVariants: {
+        variant: "default",
+    },
+});
+function Badge(_a) {
+    var className = _a.className, variant = _a.variant, props = __rest(_a, ["className", "variant"]);
+    return (<div className={cn(badgeVariants({ variant: variant }), className)} {...props}/>);
+}
+export { Badge, badgeVariants };

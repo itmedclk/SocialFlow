@@ -1,0 +1,275 @@
+import { storage } from "../storage";
+import { userSettings, type Campaign } from "@shared/schema";
+
+export interface ImageResult {
+  url: string;
+  credit: string;
+  provider: string;
+}
+
+interface UnsplashResult {
+  urls: { regular: string; small: string };
+  user: { name: string; links: { html: string } };
+  links: { html: string };
+}
+
+interface PexelsResult {
+  src: { large: string; medium: string };
+  photographer: string;
+  photographer_url: string;
+  url: string;
+}
+
+interface WikimediaResult {
+  title: string;
+  source: string;
+  descriptionurl: string;
+}
+
+interface UserSettings {
+  pexelsApiKey?: string | null;
+  unsplashAccessKey?: string | null;
+}
+
+export async function searchImage(
+  keywords: string[],
+  providers: Array<{ type: string; value: string }>,
+  campaignId?: number,
+  offset: number = 0,
+  userSettings?: UserSettings | null,
+): Promise<ImageResult | null> {
+  const query = keywords.join(" ");
+
+  // Priority order: pexels -> unsplash
+  const priority = ["pexels", "unsplash"];
+
+  // Create a sorted list based on priority
+  const sortedProviders = [...providers].sort((a, b) => {
+    const aIndex = priority.indexOf(a.type.toLowerCase());
+    const bIndex = priority.indexOf(b.type.toLowerCase());
+
+    // If provider is in priority list, use its index, otherwise put it at the end
+    const aVal = aIndex === -1 ? 999 : aIndex;
+    const bVal = bIndex === -1 ? 999 : bIndex;
+
+    return aVal - bVal;
+  });
+
+  for (const provider of sortedProviders) {
+    try {
+      let result: ImageResult | null = null;
+
+      switch (provider.type.toLowerCase()) {
+        case "unsplash":
+          result = await searchUnsplash(query, offset, userSettings?.unsplashAccessKey);
+          break;
+        case "pexels":
+          result = await searchPexels(query, offset, userSettings?.pexelsApiKey);
+          break;
+        default:
+          console.warn(`Unknown or disabled image provider: ${provider.type}`);
+      }
+
+      if (result) {
+        if (campaignId) {
+          await storage.createLog({
+            campaignId,
+            level: "info",
+            message: `Image found from ${provider.type} (offset: ${offset})`,
+            metadata: { query, url: result.url },
+          });
+        }
+        return result;
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error(`Image search failed for ${provider.type}:`, errorMessage);
+
+      if (campaignId) {
+        await storage.createLog({
+          campaignId,
+          level: "warning",
+          message: `Image search failed for ${provider.type}`,
+          metadata: { query, error: errorMessage },
+        });
+      }
+    }
+  }
+
+  return null;
+}
+
+async function searchUnsplash(
+  query: string,
+  offset: number = 0,
+  userApiKey?: string | null,
+): Promise<ImageResult | null> {
+  const apiKey = userApiKey || process.env.UNSPLASH_ACCESS_KEY;
+
+  if (!apiKey) {
+    throw new Error("UNSPLASH_ACCESS_KEY not configured");
+  }
+
+  const perPage = 1;
+  const page = offset + 1;
+  const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}&orientation=landscape`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Client-ID ${apiKey}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Unsplash API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const photo: UnsplashResult = data.results?.[0];
+
+  if (!photo) {
+    return null;
+  }
+
+  return {
+    url: photo.urls.regular,
+    credit: `Photo by ${photo.user.name} on Unsplash`,
+    provider: "unsplash",
+  };
+}
+
+async function searchPexels(
+  query: string,
+  offset: number = 0,
+  userApiKey?: string | null,
+): Promise<ImageResult | null> {
+  const apiKey = userApiKey || process.env.PEXELS_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("PEXELS_API_KEY not configured");
+  }
+
+  const perPage = 1;
+  const page = offset + 1;
+  const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}&orientation=landscape`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: apiKey,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Pexels API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const photo: PexelsResult = data.photos?.[0];
+
+  if (!photo) {
+    return null;
+  }
+
+  return {
+    url: photo.src.large,
+    credit: `Photo by ${photo.photographer} on Pexels`,
+    provider: "pexels",
+  };
+}
+
+async function searchWikimedia(
+  query: string,
+  offset: number = 0,
+): Promise<ImageResult | null> {
+  const url = `https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srnamespace=6&srlimit=1&sroffset=${offset}&format=json&origin=*`;
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Wikimedia API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const result = data.query?.search?.[0];
+
+  if (!result) {
+    return null;
+  }
+
+  const title = result.title;
+  const imageInfoUrl = `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=imageinfo&iiprop=url&format=json&origin=*`;
+
+  const imageInfoResponse = await fetch(imageInfoUrl);
+  const imageInfoData = await imageInfoResponse.json();
+  const pages = imageInfoData.query?.pages;
+  const pageId = Object.keys(pages)[0];
+  const imageInfo = pages[pageId]?.imageinfo?.[0];
+
+  if (!imageInfo?.url) {
+    return null;
+  }
+
+  return {
+    url: imageInfo.url,
+    credit: `Image from Wikimedia Commons`,
+    provider: "wikimedia",
+  };
+}
+
+export async function extractOgImage(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "SocialFlow/1.0",
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const html = await response.text();
+
+    const ogMatch =
+      html.match(
+        /<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i,
+      ) ||
+      html.match(
+        /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i,
+      );
+
+    const ogImage = ogMatch ? ogMatch[1] : null;
+
+    // Skip low-quality thumbnails or restricted Google News images
+    if (
+      ogImage &&
+      (ogImage.includes("googleusercontent.com") ||
+        ogImage.includes("news.google.com"))
+    ) {
+      return null;
+    }
+
+    return ogImage;
+  } catch (error) {
+    console.error("Failed to extract OG image:", error);
+    return null;
+  }
+}
+
+export function getImageKeywordsFromCampaign(
+  campaign: Campaign,
+  articleTitle: string,
+): string[] {
+  const configuredKeywords = campaign.imageKeywords || [];
+
+  const titleWords = articleTitle
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .split(/\s+/)
+    .filter((word) => word.length > 3)
+    .slice(0, 3);
+
+  return [...configuredKeywords, ...titleWords].slice(0, 5);
+}

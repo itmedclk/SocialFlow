@@ -87,6 +87,7 @@ async function runSchedulerCycle(): Promise<void> {
   lastSchedulerCycleTime = now;
   console.log(`[Scheduler] Running cycle at ${formatLogTime(now)}`);
   
+  // Use a transaction or explicit locking if possible, but at least handle user isolation correctly
   const campaigns = await storage.getActiveCampaigns();
 
   for (const campaign of campaigns) {

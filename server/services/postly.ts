@@ -141,7 +141,7 @@ export async function getSocialAccounts(
   try {
     const response = await fetch("https://openapi.postly.ai/v1/accounts", {
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        "X-API-KEY": apiKey,
       },
     });
 

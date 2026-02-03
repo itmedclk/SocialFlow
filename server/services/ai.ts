@@ -126,8 +126,8 @@ export async function generateCaption(
   // Reduce max_tokens for short content limits to bias shorter outputs
   // Rough estimate: 1 token ≈ 4 characters, plus buffer for JSON formatting
   const maxLength = campaign.safetyMaxLength || 2000;
-  const estimatedTokens = Math.max(200, Math.ceil(maxLength / 3) + 100);
-  const maxTokens = maxLength < 500 ? estimatedTokens : 2000;
+  const estimatedTokens = Math.max(300, Math.ceil(maxLength / 2) + 150);
+  const maxTokens = maxLength < 500 ? estimatedTokens : 2048;
 
   try {
     const response = await fetch(`${config.baseUrl}/chat/completions`, {

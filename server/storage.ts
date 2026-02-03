@@ -11,7 +11,7 @@ import {
   type InsertLog,
   type UserSettings,
   type InsertUserSettings,
-} from "@shared/schema";
+} from "../shared/schema";
 import { db } from "./db";
 import { eq, desc, and, lt } from "drizzle-orm";
 
@@ -89,27 +89,31 @@ export class DatabaseStorage implements IStorage {
   async upsertUserSettings(
     settings: InsertUserSettings,
   ): Promise<UserSettings> {
-    console.log(`[Storage] Upserting settings for userId: "${settings.userId}"`, settings);
+    console.log(`[Storage] Upserting settings for userId: "${settings.userId}"`);
+    
+    // Clean data before upsert: handle masked passwords/keys
+    const existing = await this.getUserSettings(settings.userId);
+    const cleaned: any = { ...settings };
+    
+    // Masked values should be restored from existing settings
+    const keysToRestore = [
+      'aiApiKey', 'postlyApiKey', 'unsplashAccessKey', 
+      'pexelsApiKey', 'novitaApiKey', 'googleClientSecret'
+    ];
+    
+    keysToRestore.forEach(key => {
+      if (cleaned[key] === "••••••••" && existing) {
+        cleaned[key] = (existing as any)[key];
+      }
+    });
+
     const [result] = await db
       .insert(userSettings)
-      .values(settings)
+      .values(cleaned)
       .onConflictDoUpdate({
         target: userSettings.userId,
         set: {
-          aiApiKey: settings.aiApiKey,
-          aiBaseUrl: settings.aiBaseUrl,
-          aiModel: settings.aiModel,
-          globalAiPrompt: settings.globalAiPrompt,
-          postlyApiKey: settings.postlyApiKey,
-          unsplashAccessKey: settings.unsplashAccessKey,
-          pexelsApiKey: settings.pexelsApiKey,
-          postlyWorkspaceId: settings.postlyWorkspaceId,
-          aiImageModel: settings.aiImageModel,
-          novitaApiKey: settings.novitaApiKey,
-          googleClientId: settings.googleClientId,
-          googleClientSecret: settings.googleClientSecret,
-          googleSpreadsheetId: settings.googleSpreadsheetId,
-          googleRefreshToken: settings.googleRefreshToken,
+          ...cleaned,
           updatedAt: new Date(),
         },
       })

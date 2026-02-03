@@ -6,7 +6,7 @@ import {
   insertPostSchema,
   insertLogSchema,
   insertUserSettingsSchema,
-} from "@shared/schema";
+} from "../shared/schema";
 import { z } from "zod";
 import {
   processCampaignFeeds,
@@ -745,108 +745,26 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       console.log(`[DEBUG] PUT /api/settings - userId: ${userId}`);
       console.log(`[DEBUG] PUT /api/settings - body:`, req.body);
-      const existingSettings = await storage.getUserSettings(userId);
+      
+      // Ensure userId is present in the update data
+      const cleanedData: any = { userId };
+      
+      // Explicitly pick allowed fields from request body
+      const allowedFields = [
+        'aiApiKey', 'aiBaseUrl', 'aiModel', 'globalAiPrompt',
+        'postlyApiKey', 'postlyWorkspaceId', 'unsplashAccessKey',
+        'pexelsApiKey', 'aiImageModel', 'novitaApiKey',
+        'googleClientId', 'googleClientSecret', 'googleSpreadsheetId'
+      ];
 
-      const updateData: any = { userId };
-
-      if (req.body.aiApiKey !== undefined && req.body.aiApiKey !== "••••••••") {
-        updateData.aiApiKey = req.body.aiApiKey || null;
-      } else if (existingSettings) {
-        updateData.aiApiKey = existingSettings.aiApiKey;
-      }
-
-      if (req.body.aiBaseUrl !== undefined) {
-        updateData.aiBaseUrl = req.body.aiBaseUrl || null;
-      } else if (existingSettings) {
-        updateData.aiBaseUrl = existingSettings.aiBaseUrl;
-      }
-
-      if (req.body.aiModel !== undefined) {
-        updateData.aiModel = req.body.aiModel || null;
-      } else if (existingSettings) {
-        updateData.aiModel = existingSettings.aiModel;
-      }
-
-      if (req.body.globalAiPrompt !== undefined) {
-        updateData.globalAiPrompt = req.body.globalAiPrompt || null;
-      } else if (existingSettings) {
-        updateData.globalAiPrompt = existingSettings.globalAiPrompt;
-      }
-
-      if (
-        req.body.postlyApiKey !== undefined &&
-        req.body.postlyApiKey !== "••••••••"
-      ) {
-        updateData.postlyApiKey = req.body.postlyApiKey || null;
-      } else if (existingSettings) {
-        updateData.postlyApiKey = existingSettings.postlyApiKey;
-      }
-
-      if (
-        req.body.unsplashAccessKey !== undefined &&
-        req.body.unsplashAccessKey !== "••••••••"
-      ) {
-        updateData.unsplashAccessKey = req.body.unsplashAccessKey || null;
-      } else if (existingSettings) {
-        updateData.unsplashAccessKey = existingSettings.unsplashAccessKey;
-      }
-
-      if (
-        req.body.pexelsApiKey !== undefined &&
-        req.body.pexelsApiKey !== "••••••••"
-      ) {
-        updateData.pexelsApiKey = req.body.pexelsApiKey || null;
-      } else if (existingSettings) {
-        updateData.pexelsApiKey = existingSettings.pexelsApiKey;
-      }
-
-      if (req.body.postlyWorkspaceId !== undefined) {
-        updateData.postlyWorkspaceId = req.body.postlyWorkspaceId || null;
-      } else if (existingSettings) {
-        updateData.postlyWorkspaceId = existingSettings.postlyWorkspaceId;
-      }
-
-      if (req.body.aiImageModel !== undefined) {
-        updateData.aiImageModel = req.body.aiImageModel || null;
-      } else if (existingSettings) {
-        updateData.aiImageModel = existingSettings.aiImageModel;
-      }
-
-      if (
-        req.body.novitaApiKey !== undefined &&
-        req.body.novitaApiKey !== "••••••••"
-      ) {
-        updateData.novitaApiKey = req.body.novitaApiKey || null;
-      } else if (existingSettings) {
-        updateData.novitaApiKey = existingSettings.novitaApiKey;
-      }
-
-      if (req.body.googleClientId !== undefined) {
-        updateData.googleClientId = req.body.googleClientId || null;
-      } else if (existingSettings) {
-        updateData.googleClientId = existingSettings.googleClientId;
-      }
-
-      if (
-        req.body.googleClientSecret !== undefined &&
-        req.body.googleClientSecret !== "••••••••"
-      ) {
-        updateData.googleClientSecret = req.body.googleClientSecret || null;
-      } else if (existingSettings) {
-        updateData.googleClientSecret = existingSettings.googleClientSecret;
-      }
-
-      if (req.body.googleSpreadsheetId !== undefined) {
-        updateData.googleSpreadsheetId = req.body.googleSpreadsheetId || null;
-      } else if (existingSettings) {
-        updateData.googleSpreadsheetId = existingSettings.googleSpreadsheetId;
-      }
-
-      if (existingSettings?.googleRefreshToken) {
-        updateData.googleRefreshToken = existingSettings.googleRefreshToken;
-      }
-
-      const settings = await storage.upsertUserSettings(updateData);
+      allowedFields.forEach(field => {
+        if (req.body[field] !== undefined) {
+          cleanedData[field] = req.body[field] === "" ? null : req.body[field];
+        }
+      });
+      
+      console.log(`[DEBUG] PUT /api/settings - cleanedData:`, cleanedData);
+      const settings = await storage.upsertUserSettings(cleanedData);
 
       res.json({
         ...settings,

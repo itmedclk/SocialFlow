@@ -253,10 +253,10 @@ IMPORTANT: Never use "Thread x/x" or numbered thread formats in the output. Crea
 The imageSearchPhrase should be a short, descriptive phrase (2-4 words) that would work well for searching stock photos. Focus on the main visual concept or subject of the article. Examples: "healthy smoothie bowl", "nature meditation", "fresh vegetables", "yoga sunrise". Do NOT include the imageSearchPhrase text in the caption itself.
 
 The imagePrompt should be a detailed prompt for AI image generation. CRITICAL RULES for imagePrompt:
-- Create a clean, positive, healthy, happy, bright, and natural image
-- Focus on wellness, nature, food, lifestyle, or abstract concepts
-- Images can be ANYTHING healthy and positive - not limited to people (plants, food, nature, objects, abstract art, etc.)
-- If including people, do NOT specify race, ethnicity, or skin color - keep descriptions generic like "person" or "people"
+- Create a clean, positive, healthy, bright, and natural image
+- Focus on object-only still life or nature-only landscapes
+- Images should feature objects, food, plants, products, tools, or scenery (no people)
+- Do NOT include people or human figures; avoid faces, bodies, hands, silhouettes, or crowds
 - NO organs, NO anatomy, NO medical scenes, NO surgery, NO blood
 - NO disgusting or scary content
 - NO logos, NO app icons, NO any icons, NO symbols
@@ -264,7 +264,7 @@ The imagePrompt should be a detailed prompt for AI image generation. CRITICAL RU
 - NO mention of Instagram, Facebook, Twitter, TikTok, or any social media platform
 - The mood should be light, friendly, and have gentle wellness-style humor
 
-- Examples: "Fresh colorful fruits and vegetables on a wooden table with morning sunlight", "Peaceful zen garden with smooth stones and bamboo", "Cozy cup of herbal tea with honey and lemon on a rustic table", "Abstract watercolor of flowing energy in soft pastel colors"`;
+- Examples: "Fresh colorful fruits and vegetables on a wooden table with morning sunlight", "Peaceful forest landscape with soft morning mist and sun rays", "Cozy cup of herbal tea with honey and lemon on a rustic table", "Minimalist still life of wellness items on a clean countertop"`;
 
   return prompt;
 }

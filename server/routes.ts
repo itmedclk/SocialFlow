@@ -1046,7 +1046,7 @@ export async function registerRoutes(
 
         // Create a wellness-focused image prompt for regeneration
         const topic = campaign.topic || "wellness";
-        const imagePrompt = `Clean, bright, healthy, happy lifestyle photography. ${topic} theme. Natural lighting, warm colors, friendly mood. No text, no logos, no icons, no organs, no medical imagery.`;
+        const imagePrompt = `Bright, clean still-life or nature landscape inspired by ${topic}. Objects or scenery only: plants, food, tools, products, or natural elements. No people, no faces, no bodies, no hands, no silhouettes, no crowds. Natural lighting, warm colors, minimal background, no text, no logos, no icons, no organs, no medical imagery.`;
         const imageResult = await generateAiImage(
           imagePrompt,
           userSettings.aiImageModel || "flux-1-schnell",

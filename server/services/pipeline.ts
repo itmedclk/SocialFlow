@@ -74,7 +74,9 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
       // Use AI-generated image prompt from caption generation
       try {
         // Use the imagePrompt from AI caption generation, fallback to a simple prompt if not provided
-        const finalImagePrompt = imagePrompt || `Healthy, happy, bright wellness lifestyle image related to ${campaign.topic || 'wellness'}`;
+        const finalImagePrompt =
+          imagePrompt ||
+          `Bright, clean still-life or nature landscape inspired by ${campaign.topic || "wellness"}. Objects or scenery only: plants, food, tools, products, or natural elements. No people, no faces, no bodies, no hands, no silhouettes, no crowds. Natural lighting, warm colors, minimal background, no text, no logos.`;
         const aiImageResult = await generateAiImage(
           finalImagePrompt,
           settings.aiImageModel || "flux-1-schnell",

@@ -119,3 +119,7 @@ All notable changes to SocialFlow Automation are documented in this file.
 
 #### Image Search Deduping
 - Retry multiple image offsets before returning no image when a duplicate URL is encountered
+
+#### AI Image Prompt Tuning
+- Default AI image prompts now explicitly avoid human subjects to reduce unwanted people in generated images
+- Updated imagePrompt guidance to emphasize object-only still life and nature-only landscapes

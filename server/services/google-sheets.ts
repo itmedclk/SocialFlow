@@ -62,7 +62,7 @@ export async function appendPostToSheet(
 
   const redirectUri =
     process.env.GOOGLE_OAUTH_REDIRECT_URI ||
-    "https://social-flow-test.replit.app/api/google/oauth/callback";
+    "https://social-flow-v-1.replit.app/api/google/oauth/callback";
 
   const auth = new google.auth.OAuth2(
     settings.googleClientId,

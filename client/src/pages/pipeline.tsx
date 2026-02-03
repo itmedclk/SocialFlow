@@ -1,42 +1,99 @@
 import { Layout } from "@/components/layout";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PipelineVisualizer } from "@/components/pipeline-visualizer";
-import { LogViewer } from "@/components/log-viewer";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Play, Pause, RefreshCw, Loader2, Filter } from "lucide-react";
-import { useState } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { ExternalLink, Filter, CalendarClock, CheckCircle2, XCircle } from "lucide-react";
+import { Link } from "wouter";
+import { useEffect, useMemo, useState } from "react";
+import type { Campaign, Post } from "@shared/schema";
 
-const MOCK_CAMPAIGNS = [
-  { id: "1", name: "Alternative Health Daily", topic: "Health & Wellness" },
-  { id: "2", name: "Tech Startup News", topic: "Technology" },
-  { id: "3", name: "Motivational Quotes", topic: "Lifestyle" }
+const PAGE_SIZE = 20;
+
+const statusOptions = [
+  { value: "all", label: "All Statuses" },
+  { value: "draft", label: "Draft" },
+  { value: "scheduled", label: "Scheduled" },
+  { value: "posted", label: "Posted" },
+  { value: "failed", label: "Failed" },
 ];
 
 export default function Pipeline() {
-  const [isRunning, setIsRunning] = useState(false);
-  const [selectedCampaign, setSelectedCampaign] = useState<string>("2"); // Default to Tech Startup News
-  const { toast } = useToast();
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
-  const activeCampaign = MOCK_CAMPAIGNS.find(c => c.id === selectedCampaign) || MOCK_CAMPAIGNS[0];
+  useEffect(() => {
+    fetchCampaigns();
+  }, []);
 
-  const handleRunPipeline = () => {
-    setIsRunning(true);
-    toast({
-      title: `Starting ${activeCampaign.name}`,
-      description: `Executing automation sequence for ${activeCampaign.topic}...`,
-    });
+  useEffect(() => {
+    fetchPosts();
+  }, [selectedCampaignId]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedCampaignId, statusFilter]);
+
+  const fetchCampaigns = async () => {
+    try {
+      const response = await fetch("/api/campaigns", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch campaigns");
+      const data = await response.json();
+      setCampaigns(data);
+    } catch (error) {
+      console.error("Error fetching campaigns:", error);
+    }
   };
 
-  const handleComplete = () => {
-    setIsRunning(false);
-    toast({
-      title: "Pipeline Completed",
-      description: `All steps finished for ${activeCampaign.name}.`,
-      variant: "default",
+  const fetchPosts = async () => {
+    try {
+      setLoading(true);
+      const url = selectedCampaignId !== "all"
+        ? `/api/posts?campaignId=${selectedCampaignId}`
+        : "/api/posts";
+      const response = await fetch(url, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch posts");
+      const data = await response.json();
+      setPosts(data);
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const campaignNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    campaigns.forEach((campaign) => map.set(campaign.id, campaign.name));
+    return map;
+  }, [campaigns]);
+
+  const filteredPosts = useMemo(() => {
+    const byStatus = statusFilter === "all"
+      ? posts
+      : posts.filter((post) => post.status === statusFilter);
+
+    return [...byStatus].sort((a, b) => {
+      const timeA = (a.postedAt || a.scheduledFor || a.createdAt) ? new Date(a.postedAt || a.scheduledFor || a.createdAt!).getTime() : 0;
+      const timeB = (b.postedAt || b.scheduledFor || b.createdAt) ? new Date(b.postedAt || b.scheduledFor || b.createdAt!).getTime() : 0;
+      return timeB - timeA;
     });
+  }, [posts, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPosts.length / PAGE_SIZE));
+  const pagedPosts = filteredPosts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const formatDate = (post: Post) => {
+    const target = post.status === "scheduled" && post.scheduledFor
+      ? post.scheduledFor
+      : post.postedAt || post.createdAt;
+    if (!target) return "--";
+    return new Date(target).toLocaleString("en-GB", { hour12: false });
   };
 
   return (
@@ -44,93 +101,143 @@ export default function Pipeline() {
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Pipeline Status</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Post History</h1>
             <p className="text-muted-foreground mt-1">
-              Real-time view of the automation workflow.
+              Browse all posts across campaigns with filters and history.
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 items-end sm:items-center">
-             <div className="w-[200px]">
-               <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-                 <SelectTrigger>
-                   <SelectValue placeholder="Select Campaign" />
-                 </SelectTrigger>
-                 <SelectContent>
-                   {MOCK_CAMPAIGNS.map(campaign => (
-                     <SelectItem key={campaign.id} value={campaign.id}>
-                       {campaign.name}
-                     </SelectItem>
-                   ))}
-                 </SelectContent>
-               </Select>
-             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="gap-2">
-                <Pause className="h-4 w-4" />
-                Pause
-              </Button>
-              <Button 
-                className="gap-2 shadow-lg shadow-primary/25" 
-                onClick={handleRunPipeline}
-                disabled={isRunning}
-              >
-                {isRunning ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Running...
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4" />
-                    Run Now
-                  </>
-                )}
-              </Button>
+          <div className="flex flex-col sm:flex-row gap-2 items-end sm:items-center">
+            <div className="w-[220px]">
+              <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
+                <SelectTrigger className="h-9" data-testid="select-post-history-campaign">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                    <SelectValue placeholder="All Campaigns" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Campaigns</SelectItem>
+                  {campaigns.map((campaign) => (
+                    <SelectItem key={campaign.id} value={campaign.id.toString()}>
+                      {campaign.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-[200px]">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-9" data-testid="select-post-history-status">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                    <SelectValue placeholder="All Statuses" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
-
-        <Card className="border-primary/20 bg-primary/5">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div className="space-y-1">
-              <h3 className="font-semibold text-primary flex items-center gap-2">
-                {isRunning ? "Processing Campaign:" : "Ready to Run:"}
-                <span className="text-foreground">{activeCampaign.name}</span>
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {isRunning ? (
-                  <span className="animate-pulse text-primary font-medium">Executing automated tasks for {activeCampaign.topic}...</span>
-                ) : (
-                  <>Next automated run scheduled for <span className="font-mono font-medium text-foreground">09:00 PST</span> using {activeCampaign.topic} settings.</>
-                )}
-              </p>
-            </div>
-            <Badge className={isRunning ? "bg-primary text-primary-foreground animate-pulse" : "bg-primary/20 text-primary hover:bg-primary/30 border-primary/20"}>
-              {isRunning ? "Running Now" : "Standing By"}
-            </Badge>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Execution Visualizer</CardTitle>
-            <CardDescription>Visual flow of data from RSS to Instagram</CardDescription>
+            <CardTitle>Post History</CardTitle>
           </CardHeader>
           <CardContent>
-            <PipelineVisualizer isRunning={isRunning} onComplete={handleComplete} />
+            {loading ? (
+              <div className="text-center py-8 text-muted-foreground">Loading posts...</div>
+            ) : pagedPosts.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">No posts found.</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Campaign</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pagedPosts.map((post) => (
+                    <TableRow key={post.id}>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {campaignNameById.get(post.campaignId) || `Campaign ${post.campaignId}`}
+                      </TableCell>
+                      <TableCell className="font-medium max-w-[320px] truncate">
+                        {post.sourceTitle}
+                      </TableCell>
+                      <TableCell>
+                        {post.status === "posted" && (
+                          <Badge className="bg-green-500/10 text-green-500 border-green-500/20 gap-1">
+                            <CheckCircle2 className="h-3 w-3" /> Posted
+                          </Badge>
+                        )}
+                        {post.status === "failed" && (
+                          <Badge variant="destructive" className="gap-1">
+                            <XCircle className="h-3 w-3" /> Failed
+                          </Badge>
+                        )}
+                        {post.status === "scheduled" && (
+                          <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 gap-1">
+                            <CalendarClock className="h-3 w-3" /> Scheduled
+                          </Badge>
+                        )}
+                        {post.status === "draft" && (
+                          <Badge variant="secondary" className="gap-1">
+                            Draft
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatDate(post)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Link href={`/review?postId=${post.id}`}>
+                          <Button variant="ghost" size="sm">
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            View
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+
+            <div className="flex items-center justify-between mt-4">
+              <div className="text-sm text-muted-foreground">
+                Page {page} of {totalPages}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  disabled={page === 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={page === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Execution Logs</h3>
-            <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground">
-              <RefreshCw className="h-3 w-3" />
-              Refresh
-            </Button>
-          </div>
-          <LogViewer />
-        </div>
       </div>
     </Layout>
   );

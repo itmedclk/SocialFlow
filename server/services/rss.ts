@@ -67,11 +67,17 @@ function extractImageFromContent(content: string): string | null {
 }
 
 export async function isNewArticle(
-  guid: string,
+  match: { guid?: string; url?: string; title?: string },
   campaignId?: number,
 ): Promise<boolean> {
-  const existingPost = await storage.getPostByGuid(guid, campaignId);
+  if (!campaignId) {
+    const fallbackGuid = match.guid || match.url || match.title || "";
+    if (!fallbackGuid) return true;
+    const existingPost = await storage.getPostByGuid(fallbackGuid);
+    return !existingPost;
+  }
 
+  const existingPost = await storage.getPostBySourceMatch(campaignId, match);
   return !existingPost;
 }
 
@@ -108,7 +114,14 @@ export async function processCampaignFeeds(
       result.fetched += limitedArticles.length;
 
       for (const article of limitedArticles) {
-        const isNew = await isNewArticle(article.guid, campaignId);
+        const isNew = await isNewArticle(
+          {
+            guid: article.guid,
+            url: article.link,
+            title: article.title,
+          },
+          campaignId,
+        );
 
         if (isNew) {
           const postData: InsertPost = {
@@ -133,6 +146,14 @@ export async function processCampaignFeeds(
         error instanceof Error ? error.message : String(error);
       result.errors.push(`Feed ${url}: ${errorMessage}`);
     }
+  }
+
+  if (result.fetched > 0) {
+    await storage.updateCampaign(
+      campaign.id,
+      { lastRssFetchAt: new Date() },
+      campaign.userId ?? undefined,
+    );
   }
 
   return result;

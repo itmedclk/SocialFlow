@@ -75,6 +75,46 @@ export default function Review() {
   const [imageOffsets, setImageOffsets] = useState<Record<number, number>>({});
   const [clearingArticles, setClearingArticles] = useState(false);
 
+  const resolveTimeZone = (timeZone?: string | null) => {
+    if (!timeZone) return "America/Los_Angeles";
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone });
+      return timeZone;
+    } catch (error) {
+      console.warn(
+        `[Review] Invalid timezone "${timeZone}" provided, falling back to America/Los_Angeles`,
+        error,
+      );
+      return "America/Los_Angeles";
+    }
+  };
+
+  const formatInTimeZone = (date: Date, timeZone?: string | null) => {
+    const targetZone = resolveTimeZone(timeZone);
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: targetZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
+
+    const parts = formatter.formatToParts(date);
+    const lookup = parts.reduce<Record<string, string>>((acc, part) => {
+      if (part.type !== "literal") {
+        acc[part.type] = part.value;
+      }
+      return acc;
+    }, {});
+
+    const dayPeriod = lookup.dayPeriod ? ` ${lookup.dayPeriod}` : "";
+
+    return `${lookup.year}-${lookup.month}-${lookup.day} ${lookup.hour}:${lookup.minute}:${lookup.second}${dayPeriod}`.trim();
+  };
+
   const fetchGlobalSettings = async () => {
     try {
       const response = await fetch("/api/settings", { credentials: "include" });
@@ -181,6 +221,9 @@ export default function Review() {
   }, [selectedCampaign, campaigns, globalSettings]);
 
   const currentPost = posts[selectedPostIndex];
+  const currentCampaign = currentPost
+    ? campaigns.find((campaign) => campaign.id === currentPost.campaignId)
+    : null;
   const activeCampaign =
     campaigns.find((c) => c.id.toString() === selectedCampaign) || (selectedCampaign === "all" ? null : campaigns[0]);
 
@@ -344,6 +387,11 @@ export default function Review() {
         throw new Error(errorData.error || "Failed to schedule");
       }
 
+      const formattedSchedule = formatInTimeZone(
+        scheduledFor,
+        currentCampaign?.scheduleTimezone,
+      );
+
       await fetch("/api/logs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -352,14 +400,14 @@ export default function Review() {
           campaignId: currentPost.campaignId,
           postId: currentPost.id,
           level: "info",
-          message: `Post \"${currentPost.sourceTitle}\" scheduled for ${scheduledFor.toLocaleString()}`,
-          metadata: { scheduledFor: scheduledFor.toISOString() }
+          message: `Post \"${currentPost.sourceTitle}\" scheduled for ${formattedSchedule}`,
+          metadata: { scheduledFor: scheduledFor.toISOString() },
         }),
       });
 
       toast({
         title: "Scheduled",
-        description: `Post queued for ${scheduledFor.toLocaleString()}.`,
+        description: `Post queued for ${formattedSchedule}.`,
       });
 
       setIsScheduleDialogOpen(false);
@@ -868,14 +916,12 @@ export default function Review() {
                       >
                         <CalendarClock className="h-3 w-3" />
                         {currentPost.status === 'failed' ? 'Failed: ' : 'Scheduled: '}
-                        {currentPost.scheduledFor ? new Date(currentPost.scheduledFor).toLocaleString('en-GB', { 
-                          day: '2-digit', 
-                          month: '2-digit', 
-                          year: 'numeric', 
-                          hour: '2-digit', 
-                          minute: '2-digit',
-                          hour12: false 
-                        }) : 'N/A'}
+                        {currentPost.scheduledFor
+                          ? formatInTimeZone(
+                              new Date(currentPost.scheduledFor),
+                              currentCampaign?.scheduleTimezone,
+                            )
+                          : 'N/A'}
                       </Badge>
                     <Badge variant="secondary" className="capitalize">{currentPost?.status || "Draft"}</Badge>
                   </div>

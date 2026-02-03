@@ -15,6 +15,7 @@ export var campaigns = pgTable("campaigns", {
     topic: text("topic").notNull(),
     scheduleCron: text("schedule_cron"),
     scheduleTimezone: text("schedule_timezone").default("America/Los_Angeles"),
+    lastRssFetchAt: timestamp("last_rss_fetch_at"),
     rssUrls: jsonb("rss_urls").$type().notNull().default(sql(templateObject_1 || (templateObject_1 = __makeTemplateObject(["'[]'::jsonb"], ["'[]'::jsonb"])))),
     aiPrompt: text("ai_prompt"),
     imageKeywords: jsonb("image_keywords").$type().default(sql(templateObject_2 || (templateObject_2 = __makeTemplateObject(["'[]'::jsonb"], ["'[]'::jsonb"])))),

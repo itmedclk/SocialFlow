@@ -18,8 +18,12 @@ import {
   processDraftPosts,
 } from "./services/pipeline";
 import { runNow } from "./services/scheduler";
+import { formatInTimeZone, DEFAULT_TIMEZONE, resolveTimeZone } from "./services/time";
 import { isAuthenticated } from "./replit_integrations/auth";
 import { google } from "googleapis";
+
+const formatScheduleTime = (date: Date, timezone?: string | null): string =>
+  formatInTimeZone(date, resolveTimeZone(timezone || DEFAULT_TIMEZONE));
 
 export async function registerRoutes(
   httpServer: Server,
@@ -299,12 +303,10 @@ export async function registerRoutes(
 
       const validatedData = partialSchema.parse(rawData);
 
-      // If changing from "scheduled" to "draft", set to "cancelled" instead
-      // This prevents the scheduler from re-scheduling the same post
+      // Allow moving scheduled posts back to draft pool
       if (validatedData.status === "draft") {
         const existingPost = await storage.getPost(id, userId);
         if (existingPost?.status === "scheduled") {
-          validatedData.status = "cancelled";
           validatedData.scheduledFor = null;
         }
       }
@@ -572,13 +574,19 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Post not found" });
       }
 
+      const campaign = await storage.getCampaign(post.campaignId, userId);
+      const formattedSchedule =
+        scheduledFor && campaign
+          ? formatScheduleTime(scheduledFor, campaign.scheduleTimezone)
+          : null;
+
       await storage.createLog({
         campaignId: post.campaignId,
         postId: post.id,
         userId,
         level: "info",
-        message: scheduledFor
-          ? `Post approved and scheduled for ${scheduledFor.toISOString()}`
+        message: formattedSchedule
+          ? `Post approved and scheduled for ${formattedSchedule}`
           : "Post approved",
       });
 

@@ -6,14 +6,17 @@ import { publishToPostly } from "./postly";
 import { CronExpressionParser } from "cron-parser";
 import type { Post, Campaign } from "@shared/schema";
 import { appendPostToSheet } from "./google-sheets";
+import { formatInTimeZone, DEFAULT_TIMEZONE, resolveTimeZone } from "./time";
 
 const MAX_RETRIES = 3;
+const formatCampaignTime = (date: Date, campaign: Campaign) =>
+  formatInTimeZone(date, resolveTimeZone(campaign.scheduleTimezone));
 
 function getNextScheduledTime(campaign: Campaign): Date | null {
   if (!campaign.scheduleCron) return null;
 
   try {
-    const timezone = campaign.scheduleTimezone || "America/Los_Angeles";
+    const timezone = resolveTimeZone(campaign.scheduleTimezone);
     const expression = CronExpressionParser.parse(campaign.scheduleCron, { tz: timezone });
     const next = expression.next();
     return next.toDate();
@@ -190,7 +193,7 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
         postId: post.id,
         userId: campaign.userId,
         level: "info",
-        message: `Post auto-approved and scheduled for ${scheduledFor.toISOString()}`,
+        message: `Post auto-approved and scheduled for ${formatCampaignTime(scheduledFor, campaign)}`,
       });
     }
 

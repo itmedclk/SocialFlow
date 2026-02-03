@@ -18,7 +18,7 @@ import { useState } from "react";
 const NAV_ITEMS = [
   { icon: LayoutDashboard, label: "Overview", href: "/" },
   { icon: Layers, label: "Campaigns", href: "/campaigns" },
-  { icon: Activity, label: "Pipeline Status", href: "/pipeline" },
+  { icon: Activity, label: "Post History", href: "/post-history" },
   { icon: PenTool, label: "Content Review", href: "/review" },
   { icon: FileText, label: "Audit Logs", href: "/logs" },
   { icon: Settings, label: "Global Settings", href: "/settings" },

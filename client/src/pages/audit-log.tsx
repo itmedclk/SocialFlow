@@ -66,6 +66,7 @@ export default function AuditLog() {
   };
 
   const activeCampaign = campaigns.find(c => c.id.toString() === selectedCampaignId);
+  const campaignNameById = new Map(campaigns.map((campaign) => [campaign.id, campaign.name]));
   
   const filteredLogs = logs.filter(log => 
     searchTerm === "" || 
@@ -74,7 +75,16 @@ export default function AuditLog() {
 
   const formatDateTime = (date: Date | string | null) => {
     if (!date) return "--";
-    return new Date(date).toLocaleString();
+    return new Date(date).toLocaleString("en-US", {
+      timeZone: "America/Los_Angeles",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
   };
 
   const getLevelIcon = (level: string) => {
@@ -193,7 +203,7 @@ export default function AuditLog() {
                           <div className="flex flex-wrap items-center gap-2 mt-1">
                             {log.campaignId && (
                               <div className="text-[10px] text-muted-foreground font-mono">
-                                Campaign ID: {log.campaignId}
+                                Campaign: {campaignNameById.get(log.campaignId) || `Campaign ${log.campaignId}`}
                               </div>
                             )}
                             {log.postId && (

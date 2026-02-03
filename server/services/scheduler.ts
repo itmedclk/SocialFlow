@@ -8,6 +8,7 @@ import {
 } from "./pipeline";
 import type { Campaign } from "../../shared/schema";
 import { CronExpressionParser } from "cron-parser";
+import { formatInTimeZone, DEFAULT_TIMEZONE, resolveTimeZone } from "./time";
 
 let mainLoopId: NodeJS.Timeout | null = null;
 let lastCleanupDate: string | null = null;
@@ -20,6 +21,8 @@ const MINIMUM_CYCLE_GAP = 4 * 60 * 1000; // Minimum 4 minutes between cycles (pr
 const PREPARATION_WINDOW_MINUTES = 120; // Prepare posts 2 hours before scheduled time
 const MAX_POSTS_TO_PREPARE = 2;
 const OLD_POST_DAYS = 30; // Delete published posts older than 30 days
+const RSS_FETCH_INTERVAL_MINUTES = 180; // Fetch RSS at least every 3 hours
+const formatLogTime = (date: Date) => formatInTimeZone(date, DEFAULT_TIMEZONE);
 
 export function startScheduler(): void {
   schedulerStartTime = new Date();
@@ -52,13 +55,15 @@ function getNextScheduledTime(campaign: Campaign): Date | null {
   if (!campaign.scheduleCron) return null;
 
   try {
-    const timezone = campaign.scheduleTimezone || "America/Los_Angeles";
+    const timezone = resolveTimeZone(campaign.scheduleTimezone);
     const expression = CronExpressionParser.parse(campaign.scheduleCron, { tz: timezone });
     const next = expression.next();
     const nextDate = next.toDate();
     
     // LOG: Always log the next scheduled time for debugging
-    console.log(`[Scheduler] Campaign ${campaign.id} ("${campaign.name}") next scheduled for: ${nextDate.toISOString()} (TZ: ${timezone})`);
+    console.log(
+      `[Scheduler] Campaign ${campaign.id} ("${campaign.name}") next scheduled for: ${formatInTimeZone(nextDate, timezone)} (TZ: ${timezone})`,
+    );
     
     return nextDate;
   } catch (error) {
@@ -80,7 +85,7 @@ async function runSchedulerCycle(): Promise<void> {
   }
   
   lastSchedulerCycleTime = now;
-  console.log(`[Scheduler] Running cycle at ${now.toISOString()}`);
+  console.log(`[Scheduler] Running cycle at ${formatLogTime(now)}`);
   
   const campaigns = await storage.getActiveCampaigns();
 
@@ -98,6 +103,11 @@ async function runSchedulerCycle(): Promise<void> {
         console.log(`[Scheduler] Fetching RSS for campaign ${campaign.id}...`);
         try {
           await processCampaignFeeds(campaign.id, campaign.userId ?? undefined);
+          await storage.updateCampaign(
+            campaign.id,
+            { lastRssFetchAt: new Date() },
+            campaign.userId ?? undefined,
+          );
         } catch (error) {
           console.error(
             `[Scheduler] RSS fetch error for campaign ${campaign.id}:`,
@@ -199,48 +209,60 @@ async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
   });
 
   if (hasRecentlyPublished) {
-    console.log(`[Scheduler] Post already published for slot near ${nextScheduledTime.toISOString()}, skipping`);
+    console.log(
+      `[Scheduler] Post already published for slot near ${formatInTimeZone(nextScheduledTime, campaign.scheduleTimezone)}, skipping`,
+    );
     return false; // Already published a post for this slot
   }
 
   // No post scheduled for this time slot - find a draft to schedule
-  console.log(`[Scheduler] No post scheduled for ${nextScheduledTime.toISOString()}, looking for drafts...`);
+  console.log(
+    `[Scheduler] No post scheduled for ${formatInTimeZone(nextScheduledTime, campaign.scheduleTimezone)}, looking for drafts...`,
+  );
   
   try {
     // Step 1: Check for existing drafts WITH captions first (manually prepared)
     const currentPosts = await storage.getPostsByCampaign(campaign.id, 50, campaign.userId ?? undefined);
     const draftsWithCaption = currentPosts
       .filter((post) => post.status === "draft" && post.generatedCaption)
-      .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
+      .sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
     
     if (draftsWithCaption.length > 0) {
       // Use existing draft with caption - schedule it for this time slot
-      const oldestDraft = draftsWithCaption[0];
-      await storage.updatePost(oldestDraft.id, {
+      const newestDraft = draftsWithCaption[0];
+      await storage.updatePost(newestDraft.id, {
         status: "scheduled",
         scheduledFor: nextScheduledTime,
       }, campaign.userId ?? undefined);
+      const formattedSchedule = formatInTimeZone(
+        nextScheduledTime,
+        campaign.scheduleTimezone,
+      );
       await storage.createLog({
         campaignId: campaign.id,
-        postId: oldestDraft.id,
+        postId: newestDraft.id,
         userId: campaign.userId,
         level: "info",
-        message: `Draft scheduled for ${nextScheduledTime.toISOString()}`,
+        message: `Draft scheduled for ${formattedSchedule}`,
       });
-      console.log(`[Scheduler] Scheduled existing draft ${oldestDraft.id} for ${nextScheduledTime.toISOString()}`);
+      console.log(
+        `[Scheduler] Scheduled existing draft ${newestDraft.id} for ${formattedSchedule}`,
+      );
       return true;
     }
     
     // Step 2: No drafts with captions - check for unprocessed drafts
     const unprocessedDrafts = currentPosts
       .filter((post) => post.status === "draft" && !post.generatedCaption)
-      .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
+      .sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
     
     if (unprocessedDrafts.length > 0) {
-      const oldestUnprocessed = unprocessedDrafts[0];
-      console.log(`[Scheduler] Processing draft ${oldestUnprocessed.id} for ${nextScheduledTime.toISOString()}...`);
-      await processNewPost(oldestUnprocessed, campaign, undefined, nextScheduledTime);
-      console.log(`[Scheduler] Processed and scheduled draft ${oldestUnprocessed.id}`);
+      const newestUnprocessed = unprocessedDrafts[0];
+      console.log(
+        `[Scheduler] Processing draft ${newestUnprocessed.id} for ${formatInTimeZone(nextScheduledTime, campaign.scheduleTimezone)}...`,
+      );
+      await processNewPost(newestUnprocessed, campaign, undefined, nextScheduledTime);
+      console.log(`[Scheduler] Processed and scheduled draft ${newestUnprocessed.id}`);
       return true;
     }
     
@@ -248,6 +270,13 @@ async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
     console.log(`[Scheduler] No drafts found, fetching RSS for campaign ${campaign.id}...`);
     try {
       const rssResult = await processCampaignFeeds(campaign.id, campaign.userId ?? undefined, nextScheduledTime);
+      if (rssResult.fetched > 0) {
+        await storage.updateCampaign(
+          campaign.id,
+          { lastRssFetchAt: new Date() },
+          campaign.userId ?? undefined,
+        );
+      }
       if (rssResult.new > 0) {
         console.log(`[Scheduler] Found ${rssResult.new} new articles from RSS`);
         
@@ -255,11 +284,13 @@ async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
         const refreshedPosts = await storage.getPostsByCampaign(campaign.id, 50, campaign.userId ?? undefined);
         const newDrafts = refreshedPosts
           .filter((post) => post.status === "draft" && !post.generatedCaption)
-          .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
+          .sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
         
         if (newDrafts.length > 0) {
           const newestDraft = newDrafts[0];
-          console.log(`[Scheduler] Processing new draft ${newestDraft.id} for ${nextScheduledTime.toISOString()}...`);
+          console.log(
+            `[Scheduler] Processing new draft ${newestDraft.id} for ${formatInTimeZone(nextScheduledTime, campaign.scheduleTimezone)}...`,
+          );
           await processNewPost(newestDraft, campaign, undefined, nextScheduledTime);
           console.log(`[Scheduler] Processed and scheduled new draft ${newestDraft.id}`);
           return true;
@@ -277,30 +308,25 @@ async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
   }
 }
 
-async function shouldRunRSSFetch(campaign : Campaign): Promise<boolean> {
-  const nextScheduled = getNextScheduledTime(campaign);
-  if (!nextScheduled) return false;
-
+async function shouldRunRSSFetch(campaign: Campaign): Promise<boolean> {
   const now = new Date();
-  const diffMinutes = (nextScheduled.getTime() - now.getTime()) / (1000 * 60);
+  const lastFetch = campaign.lastRssFetchAt
+    ? new Date(campaign.lastRssFetchAt)
+    : null;
 
-  // Fetch RSS only if within preparation window
-  if (diffMinutes <= PREPARATION_WINDOW_MINUTES && diffMinutes >= 0) {
-    const logs = await storage.getLogsByCampaign(campaign.id, 10);
-    const lastFetchLog = logs.find(
-      (log) =>
-        log.message.includes("RSS fetch completed") ||
-        log.message.includes("New article found"),
-    );
+  const minutesSinceLastFetch = lastFetch
+    ? (now.getTime() - lastFetch.getTime()) / (1000 * 60)
+    : Infinity;
 
-    // If no recent fetch OR last fetch was more than 3 hours ago
-    if (!lastFetchLog) return true;
+  if (minutesSinceLastFetch >= RSS_FETCH_INTERVAL_MINUTES) {
+    return true;
+  }
 
-    const lastFetchTime = new Date(lastFetchLog.createdAt!);
-    const timeSinceLastFetch =
-      (now.getTime() - lastFetchTime.getTime()) / (1000 * 60); // in minutes
-
-    return timeSinceLastFetch > 60;
+  // If no drafts are available, allow an early fetch even if interval hasn't elapsed
+  const posts = await storage.getPostsByCampaign(campaign.id, 50, campaign.userId ?? undefined);
+  const hasAvailableDraft = posts.some((post) => post.status === "draft");
+  if (!hasAvailableDraft) {
+    return true;
   }
 
   return false;

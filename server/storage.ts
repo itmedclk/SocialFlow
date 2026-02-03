@@ -13,7 +13,7 @@ import {
   type InsertUserSettings,
 } from "../shared/schema";
 import { db } from "./db";
-import { eq, desc, and, lt } from "drizzle-orm";
+import { eq, desc, and, lt, or } from "drizzle-orm";
 
 export interface IStorage {
   // User settings methods
@@ -41,6 +41,10 @@ export interface IStorage {
   ): Promise<Post[]>;
 
   getPostByGuid(guid: string, campaignId?: number): Promise<Post | undefined>;
+  getPostBySourceMatch(
+    campaignId: number,
+    match: { guid?: string; url?: string; title?: string },
+  ): Promise<Post | undefined>;
 
   createPost(post: InsertPost): Promise<Post>;
   updatePost(
@@ -260,6 +264,28 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(posts)
       .where(eq(posts.sourceGuid, guid));
+    return post || undefined;
+  }
+
+  async getPostBySourceMatch(
+    campaignId: number,
+    match: { guid?: string; url?: string; title?: string },
+  ): Promise<Post | undefined> {
+    const clauses = [eq(posts.campaignId, campaignId)];
+    const matchClauses = [
+      match.guid ? eq(posts.sourceGuid, match.guid) : null,
+      match.url ? eq(posts.sourceUrl, match.url) : null,
+      match.title ? eq(posts.sourceTitle, match.title) : null,
+    ].filter(Boolean) as Array<ReturnType<typeof eq>>;
+
+    if (matchClauses.length === 0) {
+      return undefined;
+    }
+
+    const [post] = await db
+      .select()
+      .from(posts)
+      .where(and(...clauses, or(...matchClauses)));
     return post || undefined;
   }
 

@@ -1,8 +1,11 @@
 import { google } from "googleapis";
 import type { Campaign, Post } from "@shared/schema";
 import { storage } from "../storage";
+import { formatInTimeZone, DEFAULT_TIMEZONE } from "./time";
 
 const DEFAULT_SHEET_NAME = "Posts";
+const formatSheetTime = (date: Date, timezone?: string | null) =>
+  formatInTimeZone(date, timezone || DEFAULT_TIMEZONE);
 
 async function getTargetSheetName(
   sheets: ReturnType<typeof google.sheets>,
@@ -75,7 +78,7 @@ export async function appendPostToSheet(
 
   const caption = captionOverride || post.generatedCaption || "";
   const row = [
-    new Date().toISOString(),
+    formatSheetTime(new Date(), campaign.scheduleTimezone),
     post.id?.toString() || "",
     campaign.name || "",
     post.sourceTitle || "",

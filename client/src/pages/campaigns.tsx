@@ -2,7 +2,7 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Play, Pause, Settings2, Clock, Trash2, Edit, ExternalLink, Calendar, Globe } from "lucide-react";
+import { Plus, Play, Pause, Settings2, Clock, Trash2, Edit, Calendar, Globe } from "lucide-react";
 import { Link } from "wouter";
 import { useEffect, useState } from "react";
 import type { Campaign } from "@shared/schema";
@@ -152,12 +152,6 @@ export default function Campaigns() {
                 </CardContent>
                 <CardFooter className="pt-3 border-t bg-muted/5 flex justify-between gap-2">
                   <div className="flex gap-2">
-                    <Link href={`/campaigns/${campaign.id}/details`}>
-                      <Button variant="outline" size="sm" className="h-8 gap-1.5">
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        Posts
-                      </Button>
-                    </Link>
                     <Link href={`/campaigns/${campaign.id}`}>
                       <Button variant="outline" size="sm" className="h-8 gap-1.5" data-testid={`button-configure-${campaign.id}`}>
                         <Settings2 className="h-3.5 w-3.5" />

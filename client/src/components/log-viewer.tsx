@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import type { Log } from "@shared/schema";
+import type { Campaign, Log } from "@shared/schema";
 
 function formatMetadata(metadata: unknown): string {
   if (!metadata) return "";
@@ -17,13 +17,27 @@ function formatMetadata(metadata: unknown): string {
 
 export function LogViewer() {
   const [logs, setLogs] = useState<Log[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    fetchCampaigns();
     fetchLogs();
     const interval = setInterval(fetchLogs, 10000);
     return () => clearInterval(interval);
   }, []);
+  const fetchCampaigns = async () => {
+    try {
+      const response = await fetch('/api/campaigns', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch campaigns');
+      const data = await response.json();
+      setCampaigns(data);
+    } catch (error) {
+      console.error('Error fetching campaigns:', error);
+    }
+  };
+
+  const campaignNameById = new Map(campaigns.map((campaign) => [campaign.id, campaign.name]));
 
   const fetchLogs = async () => {
     try {
@@ -41,7 +55,13 @@ export function LogViewer() {
   const formatTime = (date: Date | string | null) => {
     if (!date) return "--:--:--";
     const d = new Date(date);
-    return d.toLocaleTimeString('en-US', { hour12: false });
+    return d.toLocaleTimeString('en-US', {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+      timeZone: "America/Los_Angeles",
+    });
   };
 
   return (
@@ -82,6 +102,11 @@ export function LogViewer() {
                     </span>
                     <div className="flex flex-col flex-1 min-w-0">
                       <span className="text-slate-300 font-medium truncate">{log.message}</span>
+                      {log.campaignId && (
+                        <span className="text-xs text-slate-500">
+                          Campaign: {campaignNameById.get(log.campaignId) || `Campaign ${log.campaignId}`}
+                        </span>
+                      )}
                       {log.postId && (
                         <Link href={`/review?postId=${log.postId}`}>
                           <Button variant="link" className="h-auto p-0 text-xs text-primary w-fit mt-1">

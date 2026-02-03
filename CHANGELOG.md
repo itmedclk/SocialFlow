@@ -56,3 +56,51 @@ All notable changes to SocialFlow Automation are documented in this file.
 - `server/routes.ts` - Added prompt sync and image search endpoints
 - `client/src/pages/settings.tsx` - Added global AI prompt field
 - `client/src/pages/review.tsx` - Implemented prompt hierarchy and image search
+
+## [2026-02-03] - Scheduler Reliability & RSS Gating Improvements
+
+### Problems Addressed
+1. Scheduler depended on fragile log parsing for RSS gating
+2. Auto-publish scheduler chose oldest drafts (not newest)
+3. Scheduled posts could not be returned to draft pool
+4. Missing `/health` endpoint and Replit dirty files cluttered repo
+
+### Changes Made
+
+#### Scheduler & RSS Fetching
+- Added `campaigns.last_rss_fetch_at` to track reliable RSS fetch timestamps
+- Scheduler now fetches RSS if last fetch >= 3 hours **or** post pool is empty
+- Scheduler selects **newest** drafts for scheduling
+- Scheduler updates `lastRssFetchAt` after fetch
+- RSS manual fetch also updates `lastRssFetchAt`
+
+#### Post Workflow
+- Scheduled posts can be moved back to `draft` (unschedule)
+
+#### Ops/Infrastructure
+- Added `/health` endpoint for keepalive
+- Updated `.gitignore` with standard Replit dirty files
+- Standardized log timestamps to America/Los_Angeles (PST/PDT)
+- Google Sheets export timestamps now use America/Los_Angeles (PST/PDT)
+
+#### Scheduler Timezone Consistency Fixes
+- Added a shared timezone formatter (`server/services/time.ts`) for scheduler/log timestamps
+- Scheduler/pipeline/routes now log scheduled times using the campaign timezone (default America/Los_Angeles)
+- Review scheduling logs/toasts and scheduled badges now display times in the campaign timezone
+- Log Viewer + Audit Log UI now render timestamps in America/Los_Angeles to match server output
+
+#### RSS Deduplication Improvements
+- RSS ingestion now de-dupes per campaign by GUID, source URL, or title (for feeds missing GUIDs)
+
+#### UI Updates
+- Replaced Pipeline Status with Post History (campaign + status filters)
+- Added pagination to Post History table
+- Renamed route to `/post-history` and updated sidebar label
+- Removed per-campaign Posts button from campaign cards
+- Audit Logs and Log Viewer now show campaign names instead of IDs
+
+#### Timezone + Pipeline Page Fixes
+- Added timezone normalization helper to prevent invalid schedule timezones from skewing log messages
+- Scheduler, pipeline, and approval routes now resolve timezones before cron parsing/log formatting
+- Review page message scheduling now validates timezone and falls back to America/Los_Angeles
+- Pipeline Status mock page now delegates to the Post History view so UI reflects real schedule times

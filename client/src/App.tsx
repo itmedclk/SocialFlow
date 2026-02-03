@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Settings from "@/pages/settings";
-import Pipeline from "@/pages/pipeline";
+import Pipeline from "@/pages/pipeline.tsx";
 import Review from "@/pages/review";
 import AuditLog from "@/pages/audit-log";
 import Campaigns from "@/pages/campaigns";
@@ -61,7 +61,7 @@ function AuthenticatedRouter() {
       <Route path="/campaigns" component={Campaigns} />
       <Route path="/campaigns/:id" component={CampaignEditor} />
       <Route path="/campaigns/:id/details" component={CampaignDetails} />
-      <Route path="/pipeline" component={Pipeline} />
+      <Route path="/post-history" component={Pipeline} />
       <Route path="/review" component={Review} />
       <Route path="/logs" component={AuditLog} />
       <Route path="/settings" component={Settings} />

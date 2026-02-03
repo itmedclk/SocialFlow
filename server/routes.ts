@@ -928,21 +928,28 @@ export async function registerRoutes(
               ];
 
           // Use AI-generated image search phrase if available, otherwise fall back to campaign keywords + title
-          const keywords = post.imageSearchPhrase 
+          const keywords = post.imageSearchPhrase
             ? [post.imageSearchPhrase, ...(campaign.imageKeywords || [])]
             : getImageKeywordsFromCampaign(campaign, post.sourceTitle);
-          
-          // Pass offset to searchImage
-          const userSettings = await storage.getUserSettings(userId);
-          const imageResult = await searchImage(
-            keywords,
-            providers,
-            campaign.id,
-            currentOffset,
-            userSettings,
-          );
 
-          if (imageResult) {
+          const userSettings = await storage.getUserSettings(userId);
+          const maxAttempts = 4;
+          let attemptOffset = currentOffset;
+
+          for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+            const imageResult = await searchImage(
+              keywords,
+              providers,
+              campaign.id,
+              attemptOffset,
+              userSettings,
+            );
+
+            if (!imageResult) {
+              attemptOffset += 1;
+              continue;
+            }
+
             const duplicateImage = await storage.getPostByImageUrlInCampaign(
               campaign.id,
               imageResult.url,
@@ -950,7 +957,10 @@ export async function registerRoutes(
             if (!duplicateImage || duplicateImage.id === post.id) {
               imageUrl = imageResult.url;
               imageCredit = imageResult.credit;
+              break;
             }
+
+            attemptOffset += 1;
           }
         }
 

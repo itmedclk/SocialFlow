@@ -116,3 +116,6 @@ All notable changes to SocialFlow Automation are documented in this file.
 #### Review Page Fetch Consistency
 - Added auth credentials to AI image generation and article clear actions
 - Surface RSS fetch errors in the review toast to highlight blocked feeds
+
+#### Image Search Deduping
+- Retry multiple image offsets before returning no image when a duplicate URL is encountered

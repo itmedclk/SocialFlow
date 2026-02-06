@@ -33,6 +33,7 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
     const safetyConfig = getSafetyConfigFromCampaign(campaign);
     let caption: string | null = null;
     let imageSearchPhrase: string = "";
+    let imageFallbackConcepts: string[] = [];
     let imagePrompt: string = "";
     let safetyResult: { isValid: boolean; issues: string[] } = { isValid: false, issues: [] };
     
@@ -52,6 +53,7 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
       const result = await generateCaption(post, campaign, overridePrompt);
       caption = result.caption;
       imageSearchPhrase = result.imageSearchPhrase;
+      imageFallbackConcepts = result.imageFallbackConcepts;
       imagePrompt = result.imagePrompt;
       safetyResult = validateContent(caption, safetyConfig);
       
@@ -175,6 +177,27 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
             level: "warning",
             message: `Image search failed or returned duplicates, retrying (attempt ${imageAttempts}/${MAX_RETRIES})`,
           });
+        }
+      }
+
+      // If still no image after searching with specific phrase, try fallback concepts
+      if (!imageUrl && imageFallbackConcepts && imageFallbackConcepts.length > 0) {
+        console.log(`[Pipeline] Specific image search failed, trying fallback concepts: ${imageFallbackConcepts.join(", ")}`);
+        const fallbackResult = await searchImage(imageFallbackConcepts, providers, campaign.id, 0, settings);
+        if (fallbackResult) {
+          const isDuplicate = await storage.getPostByImageUrl(fallbackResult.url);
+          if (!isDuplicate) {
+            imageUrl = fallbackResult.url;
+            imageCredit = fallbackResult.credit;
+            
+            await storage.createLog({
+              campaignId: campaign.id,
+              postId: post.id,
+              userId: campaign.userId,
+              level: "info",
+              message: `Image found using fallback concepts: ${imageFallbackConcepts.join(", ")}`,
+            });
+          }
         }
       }
     }

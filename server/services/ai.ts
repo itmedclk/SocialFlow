@@ -96,6 +96,7 @@ async function fetchFullContent(url: string): Promise<string | null> {
 export interface CaptionResult {
   caption: string;
   imageSearchPhrase: string;
+  imageFallbackConcepts: string[];
   imagePrompt: string;
 }
 
@@ -159,6 +160,7 @@ export async function generateCaption(
     // Parse JSON response
     let caption: string;
     let imageSearchPhrase: string = "";
+    let imageFallbackConcepts: string[] = [];
     let imagePrompt: string = "";
 
     try {
@@ -168,6 +170,7 @@ export async function generateCaption(
         const parsed = JSON.parse(jsonMatch[0]);
         caption = parsed.caption || rawContent;
         imageSearchPhrase = parsed.imageSearchPhrase || "";
+        imageFallbackConcepts = parsed.imageFallbackConcepts || [];
         imagePrompt = parsed.imagePrompt || "";
       } else {
         // Fallback: treat entire response as caption
@@ -196,11 +199,12 @@ export async function generateCaption(
         model: config.model,
         captionLength: caption.length,
         imageSearchPhrase,
+        imageFallbackConcepts,
         imagePrompt: imagePrompt.substring(0, 100),
       },
     });
 
-    return { caption, imageSearchPhrase, imagePrompt };
+    return { caption, imageSearchPhrase, imageFallbackConcepts, imagePrompt };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
@@ -247,10 +251,28 @@ IMPORTANT: Never use "Thread x/x" or numbered thread formats in the output. Crea
 {
   "caption": "Your social media caption here",
   "imageSearchPhrase": "2-4 word phrase for stock photo search",
+  "imageFallbackConcepts": ["1–2 broad concepts"],
   "imagePrompt": "Detailed AI image generation prompt"
 }
 
 The imageSearchPhrase should be a short, descriptive phrase (2-4 words) that would work well for searching stock photos. Focus on the main visual concept or subject of the article. Examples: "healthy smoothie bowl", "nature meditation", "fresh vegetables", "yoga sunrise". Do NOT include the imageSearchPhrase text in the caption itself.
+
+Rules for imageSearchPhrase:
+- MUST be specific and concrete
+- 2–4 words
+- Describes a visible object, food, plant, tool, or scenery
+- Example: "herbal tea cup", "fresh blueberries bowl", "sunlit forest path"
+
+Rules for imageFallbackConcepts:
+- 1–2 GENERAL concepts only
+- Used ONLY as a backup if imageSearchPhrase fails
+- Can be abstract or broad
+- Example values: ["health"], ["nutrition"], ["wellness"], ["eye health"]
+
+CRITICAL:
+- Do NOT put general concepts into imageSearchPhrase
+- If no specific visual can be inferred, still attempt a best-guess imageSearchPhrase,
+  and place general concepts ONLY in imageFallbackConcepts
 
 The imagePrompt should be a detailed prompt for AI image generation. CRITICAL RULES for imagePrompt:
 - Create a clean, positive, healthy, bright, and natural image

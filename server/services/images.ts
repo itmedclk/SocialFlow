@@ -61,10 +61,18 @@ export async function searchImage(
 
       switch (provider.type.toLowerCase()) {
         case "unsplash":
-          result = await searchUnsplash(query, offset, userSettings?.unsplashAccessKey);
+          result = await searchUnsplash(
+            query,
+            offset,
+            userSettings?.unsplashAccessKey,
+          );
           break;
         case "pexels":
-          result = await searchPexels(query, offset, userSettings?.pexelsApiKey);
+          result = await searchPexels(
+            query,
+            offset,
+            userSettings?.pexelsApiKey,
+          );
           break;
         default:
           console.warn(`Unknown or disabled image provider: ${provider.type}`);
@@ -108,7 +116,9 @@ async function searchUnsplash(
   const apiKey = userApiKey || process.env.UNSPLASH_ACCESS_KEY;
 
   if (!apiKey) {
-    console.log(`[Images] Unsplash API key missing (user provided: ${!!userApiKey}, env: ${!!process.env.UNSPLASH_ACCESS_KEY})`);
+    console.log(
+      `[Images] Unsplash API key missing (user provided: ${!!userApiKey}, env: ${!!process.env.UNSPLASH_ACCESS_KEY})`,
+    );
     throw new Error("UNSPLASH_ACCESS_KEY not configured");
   }
 
@@ -128,7 +138,9 @@ async function searchUnsplash(
 
   const data = await response.json();
   // Filter for higher resolution/quality if possible, though 'regular' is usually good
-  const photo: UnsplashResult = data.results?.find((p: any) => p.width >= 1080 && p.height >= 1080) || data.results?.[0];
+  const photo: UnsplashResult =
+    data.results?.find((p: any) => p.width >= 1080 && p.height >= 1080) ||
+    data.results?.[0];
 
   if (!photo) {
     return null;
@@ -149,7 +161,9 @@ async function searchPexels(
   const apiKey = userApiKey || process.env.PEXELS_API_KEY;
 
   if (!apiKey) {
-    console.log(`[Images] Pexels API key missing (user provided: ${!!userApiKey}, env: ${!!process.env.PEXELS_API_KEY})`);
+    console.log(
+      `[Images] Pexels API key missing (user provided: ${!!userApiKey}, env: ${!!process.env.PEXELS_API_KEY})`,
+    );
     throw new Error("PEXELS_API_KEY not configured");
   }
 
@@ -159,7 +173,7 @@ async function searchPexels(
 
   const response = await fetch(url, {
     headers: {
-      Authorization: apiKey,
+      "Authorization": apiKey.trim(),
     },
   });
 
@@ -169,7 +183,8 @@ async function searchPexels(
 
   const data = await response.json();
   // Filter for images that meet typical social media standards (e.g. min 1080px width)
-  const photo: PexelsResult = data.photos?.find((p: any) => p.width >= 1080) || data.photos?.[0];
+  const photo: PexelsResult =
+    data.photos?.find((p: any) => p.width >= 1080) || data.photos?.[0];
 
   if (!photo) {
     return null;

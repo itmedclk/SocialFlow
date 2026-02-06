@@ -1,7 +1,7 @@
 import { storage } from "../storage";
 import { db } from "../db";
-import { userSettings } from "@shared/schema";
-import type { Post, Campaign } from "@shared/schema";
+import { userSettings } from "../../shared/schema";
+import type { Post, Campaign } from "../../shared/schema";
 import { Readability } from "@mozilla/readability";
 import { JSDOM } from "jsdom";
 

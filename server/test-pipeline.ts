@@ -18,7 +18,25 @@ async function testFullPipeline(campaignId: number, shouldPublish: boolean = fal
 
     // 1. Fetch RSS Articles
     console.log("\n📡 Step 1: Fetching RSS articles...");
-    const rssResult = await processCampaignFeeds(campaignId, campaign.userId || undefined);
+    let rssResult = { articles: [] as any[], new: 0, fetched: 0 };
+    
+    if (process.argv.includes("--force")) {
+      console.log("⚠️  Forcing processing of a test article...");
+      rssResult = {
+        articles: [{
+          title: "Exploring the Benefits of Integrative Health and Wellness",
+          link: "https://example.com/test-article",
+          pubDate: new Date().toISOString(),
+          content: "This is a test article for pipeline verification.",
+          snippet: "This is a test article for pipeline verification.",
+          guid: "test-guid-" + Date.now()
+        }],
+        new: 1,
+        fetched: 1
+      };
+    } else {
+      rssResult = await processCampaignFeeds(campaignId, campaign.userId || undefined);
+    }
     
     if (!rssResult.articles || rssResult.articles.length === 0) {
       console.log("ℹ️ No new articles found to process.");

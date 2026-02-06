@@ -122,6 +122,7 @@ export async function processCampaignFeeds(
   fetched: number;
   new: number;
   errors: string[];
+  articles?: ParsedArticle[];
 }> {
   const campaign = await storage.getCampaign(campaignId, userId);
 
@@ -129,10 +130,16 @@ export async function processCampaignFeeds(
     throw new Error(`Campaign ${campaignId} not found`);
   }
 
-  const result = {
+  const result: {
+    fetched: number;
+    new: number;
+    errors: string[];
+    articles: ParsedArticle[];
+  } = {
     fetched: 0,
     new: 0,
-    errors: [] as string[],
+    errors: [],
+    articles: [],
   };
 
   const rssUrls = campaign.rssUrls || [];
@@ -156,37 +163,9 @@ export async function processCampaignFeeds(
           campaignId,
         );
 
-        // Only save if it's new and we need it (scheduling or manual review)
-        // However, the user asked to only save used/failed/scheduled posts.
-        // In this pipeline, RSS articles are potential drafts.
-        // To satisfy "don't save unused post", we'll only create a post if it's actually going to be processed.
-        // If it's a manual campaign, we still need drafts for the user to review.
-        // If it's auto-publish, the scheduler will handle the flow.
-        
-        // Wait, the user said "clear all unused draft post" and "don't save unused post".
-        // This implies we should only save posts when they are being scheduled or failed.
-        
         if (isNew) {
-          const postData: InsertPost = {
-            campaignId,
-            userId: userId || campaign.userId,
-            sourceTitle: article.title,
-            sourceUrl: article.link,
-            sourceGuid: article.guid,
-            sourceSnippet: article.snippet,
-            pubDate: article.pubDate,
-            imageUrl: article.imageUrl,
-            status: "draft",
-          };
-
-          // If auto-publish is off, we save as draft for user review.
-          // If auto-publish is on, the scheduler will pick it up.
-          // The constraint "only save used/failed/scheduled" is tricky because a draft IS a potential "used" post.
-          // I will interpret "unused" as drafts that have been sitting there and were never promoted.
-          // But for NEW ones, we have to save them to process them.
-          
-          await storage.createPost(postData);
           result.new++;
+          result.articles.push(article);
         }
       }
     } catch (error) {

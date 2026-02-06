@@ -273,31 +273,35 @@ async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
     console.log(`[Scheduler] No drafts found, fetching RSS for campaign ${campaign.id}...`);
     try {
       const rssResult = await processCampaignFeeds(campaign.id, campaign.userId ?? undefined, nextScheduledTime);
-      if (rssResult.fetched > 0) {
-        await storage.updateCampaign(
-          campaign.id,
-          { lastRssFetchAt: new Date() },
-          campaign.userId ?? undefined,
-        );
-      }
-      if (rssResult.new > 0) {
+      
+      if (rssResult.new > 0 && rssResult.articles && rssResult.articles.length > 0) {
         console.log(`[Scheduler] Found ${rssResult.new} new articles from RSS`);
         
-        // Refresh posts list to get newly created drafts
-        const refreshedPosts = await storage.getPostsByCampaign(campaign.id, 50, campaign.userId ?? undefined);
-        const newDrafts = refreshedPosts
-          .filter((post) => post.status === "draft" && !post.generatedCaption)
-          .sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+        const newestArticle = rssResult.articles[0];
         
-        if (newDrafts.length > 0) {
-          const newestDraft = newDrafts[0];
-          console.log(
-            `[Scheduler] Processing new draft ${newestDraft.id} for ${formatInTimeZone(nextScheduledTime, campaign.scheduleTimezone)}...`,
-          );
-          await processNewPost(newestDraft, campaign, undefined, nextScheduledTime);
-          console.log(`[Scheduler] Processed and scheduled new draft ${newestDraft.id}`);
-          return true;
-        }
+        // Create the post directly with scheduled status instead of draft
+        const postData = {
+          campaignId: campaign.id,
+          userId: campaign.userId,
+          sourceTitle: newestArticle.title,
+          sourceUrl: newestArticle.link,
+          sourceGuid: newestArticle.guid,
+          sourceSnippet: newestArticle.snippet,
+          pubDate: newestArticle.pubDate,
+          imageUrl: newestArticle.imageUrl,
+          status: "scheduled",
+          scheduledFor: nextScheduledTime,
+        };
+
+        const post = await storage.createPost(postData as any);
+        
+        console.log(
+          `[Scheduler] Processing new article ${post.id} for ${formatInTimeZone(nextScheduledTime, campaign.scheduleTimezone)}...`,
+        );
+        
+        await processNewPost(post, campaign, undefined, nextScheduledTime);
+        console.log(`[Scheduler] Processed and scheduled new post ${post.id}`);
+        return true;
       }
     } catch (error) {
       console.error(`[Scheduler] RSS fetch error for campaign ${campaign.id}:`, error);

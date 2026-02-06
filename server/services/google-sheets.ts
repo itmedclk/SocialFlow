@@ -84,7 +84,7 @@ export async function appendPostToSheet(
     post.sourceTitle || "",
     post.sourceUrl || "",
     caption,
-    post.imageUrl || "",
+    post.imageUrl ? `=IMAGE("${post.imageUrl}")` : "",
     post.imageCredit || "",
   ];
 

@@ -58,6 +58,7 @@ Preferred communication style: Simple, everyday language.
   - **Cold-start protection**: 60-second startup delay prevents immediate posting on server wake
   - **Rapid-restart protection**: 4-minute minimum gap between scheduler cycles
   - **Duplicate prevention**: Checks both scheduled AND recently published posts (30-min window)
+  - **Cleanup**: Deletes published posts older than 30 days and unused drafts older than 7 days
   - Runs in both development and production environments with same safeguards
 
 ### Key Design Decisions

@@ -485,6 +485,29 @@ export class DatabaseStorage implements IStorage {
     return oldPosts.length;
   }
 
+  async deleteOldDrafts(daysOld: number): Promise<number> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+
+    const draftStatus = "draft" as const;
+    const oldDrafts = await db
+      .select({ id: posts.id })
+      .from(posts)
+      .where(
+        and(eq(posts.status, draftStatus), lt(posts.createdAt, cutoffDate)),
+      );
+
+    if (oldDrafts.length === 0) {
+      return 0;
+    }
+
+    for (const post of oldDrafts) {
+      await db.delete(posts).where(eq(posts.id, post.id));
+    }
+
+    return oldDrafts.length;
+  }
+
   // ============================================
   // Log Methods
   // ============================================

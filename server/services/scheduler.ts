@@ -147,6 +147,8 @@ async function runSchedulerCycle(): Promise<void> {
   // Run daily cleanup of old published posts
   try {
     await runDailyCleanup();
+    // Also clean up unused drafts (drafts older than 7 days that aren't used)
+    await storage.deleteOldDrafts(7);
   } catch (error) {
     console.error("[Scheduler] Cleanup error:", error);
   }

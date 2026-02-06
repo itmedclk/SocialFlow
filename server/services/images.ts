@@ -111,9 +111,9 @@ async function searchUnsplash(
     throw new Error("UNSPLASH_ACCESS_KEY not configured");
   }
 
-  const perPage = 1;
+  const perPage = 5; // Fetch more to filter for quality
   const page = offset + 1;
-  const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}&orientation=landscape`;
+  const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}&orientation=landscape&content_filter=high`;
 
   const response = await fetch(url, {
     headers: {
@@ -126,7 +126,8 @@ async function searchUnsplash(
   }
 
   const data = await response.json();
-  const photo: UnsplashResult = data.results?.[0];
+  // Filter for higher resolution/quality if possible, though 'regular' is usually good
+  const photo: UnsplashResult = data.results?.find((p: any) => p.width >= 1080 && p.height >= 1080) || data.results?.[0];
 
   if (!photo) {
     return null;
@@ -150,9 +151,9 @@ async function searchPexels(
     throw new Error("PEXELS_API_KEY not configured");
   }
 
-  const perPage = 1;
+  const perPage = 5;
   const page = offset + 1;
-  const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}&orientation=landscape`;
+  const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}&orientation=landscape&size=large`;
 
   const response = await fetch(url, {
     headers: {
@@ -165,7 +166,8 @@ async function searchPexels(
   }
 
   const data = await response.json();
-  const photo: PexelsResult = data.photos?.[0];
+  // Filter for images that meet typical social media standards (e.g. min 1080px width)
+  const photo: PexelsResult = data.photos?.find((p: any) => p.width >= 1080) || data.photos?.[0];
 
   if (!photo) {
     return null;

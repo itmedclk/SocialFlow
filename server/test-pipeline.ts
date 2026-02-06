@@ -51,7 +51,8 @@ async function testFullPipeline(campaignId: number) {
 
     // 3. Process the Post (Generate Caption + Image Search)
     console.log("\n🤖 Step 3: Running pipeline (AI Generation + Image Search)...");
-    await processNewPost(post, campaign, undefined, nextScheduledTime);
+    const testCampaign = { ...campaign, userId: campaign.userId || 1 } as any; // Ensure a valid userId for testing
+    await processNewPost(post, testCampaign, undefined, nextScheduledTime);
     
     // Fetch updated post to see results
     const updatedPost = await storage.getPost(post.id);

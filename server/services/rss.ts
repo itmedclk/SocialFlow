@@ -3,7 +3,7 @@ import { storage } from "../storage";
 import { type InsertPost } from "../../shared/schema";
 import { processNewPost } from "./pipeline";
 
-const parser = new Parser({
+const parser: Parser = new Parser({
   timeout: 15000,
 });
 

@@ -108,6 +108,7 @@ async function searchUnsplash(
   const apiKey = userApiKey || process.env.UNSPLASH_ACCESS_KEY;
 
   if (!apiKey) {
+    console.log(`[Images] Unsplash API key missing (user provided: ${!!userApiKey}, env: ${!!process.env.UNSPLASH_ACCESS_KEY})`);
     throw new Error("UNSPLASH_ACCESS_KEY not configured");
   }
 
@@ -148,6 +149,7 @@ async function searchPexels(
   const apiKey = userApiKey || process.env.PEXELS_API_KEY;
 
   if (!apiKey) {
+    console.log(`[Images] Pexels API key missing (user provided: ${!!userApiKey}, env: ${!!process.env.PEXELS_API_KEY})`);
     throw new Error("PEXELS_API_KEY not configured");
   }
 

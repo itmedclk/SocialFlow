@@ -158,24 +158,24 @@ async function searchPexels(
   offset: number = 0,
   userApiKey?: string | null,
 ): Promise<ImageResult | null> {
-  const apiKey = userApiKey || process.env.PEXELS_API_KEY;
+  const rawKey = userApiKey || process.env.PEXELS_API_KEY;
 
-  if (!apiKey) {
+  if (!rawKey) {
     console.log(
       `[Images] Pexels API key missing (user provided: ${!!userApiKey}, env: ${!!process.env.PEXELS_API_KEY})`,
     );
     throw new Error("PEXELS_API_KEY not configured");
   }
 
+  const apiKey = rawKey.trim().replace(/[\r\n\t]/g, "");
+
   const perPage = 5;
   const page = offset + 1;
   const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}&orientation=landscape&size=large`;
 
-  console.log(`[Pexels] Requesting: ${url}`);
   const response = await fetch(url, {
     headers: {
-      "Authorization": apiKey.trim(),
-      "Accept": "application/json"
+      "Authorization": apiKey,
     },
   });
 

@@ -35,7 +35,8 @@ async function testFullPipeline(campaignId: number, shouldPublish: boolean = fal
         fetched: 1
       };
     } else {
-      rssResult = await processCampaignFeeds(campaignId, campaign.userId || undefined);
+      const feedResult = await processCampaignFeeds(campaignId, campaign.userId || undefined);
+      rssResult = { articles: feedResult.articles || [], new: feedResult.new, fetched: feedResult.fetched };
     }
     
     if (!rssResult.articles || rssResult.articles.length === 0) {

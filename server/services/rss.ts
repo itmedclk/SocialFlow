@@ -1,6 +1,6 @@
 import Parser from "rss-parser";
 import { storage } from "../storage";
-import { type InsertPost } from "@shared/schema";
+import { type InsertPost } from "../../shared/schema";
 import { processNewPost } from "./pipeline";
 
 const parser = new Parser({

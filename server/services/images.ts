@@ -1,5 +1,5 @@
 import { storage } from "../storage";
-import { userSettings, type Campaign } from "@shared/schema";
+import { userSettings, type Campaign } from "../../shared/schema";
 
 export interface ImageResult {
   url: string;

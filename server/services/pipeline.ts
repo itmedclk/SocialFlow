@@ -159,10 +159,13 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
         const imageResult = await searchImage(keywords, providers, campaign.id, imageAttempts - 1, settings);
         
         if (imageResult) {
-          const duplicateImage = await storage.getPostByImageUrlInCampaign(campaign.id, imageResult.url);
-          if (!duplicateImage || duplicateImage.id === post.id) {
+          // Web-wide deduplication check
+          const isDuplicate = await storage.getPostByImageUrl(imageResult.url);
+          if (!isDuplicate) {
             imageUrl = imageResult.url;
             imageCredit = imageResult.credit;
+          } else {
+            console.log(`[Pipeline] Skipping duplicate image found web-wide: ${imageResult.url}`);
           }
         } else if (imageAttempts < MAX_RETRIES) {
           await storage.createLog({
@@ -170,7 +173,7 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
             postId: post.id,
             userId: campaign.userId,
             level: "warning",
-            message: `Image search failed, retrying (attempt ${imageAttempts}/${MAX_RETRIES})`,
+            message: `Image search failed or returned duplicates, retrying (attempt ${imageAttempts}/${MAX_RETRIES})`,
           });
         }
       }

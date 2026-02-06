@@ -1,9 +1,9 @@
 import { storage } from "./storage";
 import { processCampaignFeeds } from "./services/rss";
-import { processNewPost } from "./services/pipeline";
+import { processNewPost, publishPost } from "./services/pipeline";
 import { format } from "date-fns";
 
-async function testFullPipeline(campaignId: number) {
+async function testFullPipeline(campaignId: number, shouldPublish: boolean = false) {
   console.log(`\n🚀 Starting Full Pipeline Test for Campaign ID: ${campaignId}`);
   
   try {
@@ -29,7 +29,7 @@ async function testFullPipeline(campaignId: number) {
     const newestArticle = rssResult.articles[0];
     console.log(`📝 Selected Article: ${newestArticle.title}`);
 
-    // 2. Create Post directly with 'scheduled' status (as per current logic)
+    // 2. Create Post directly with 'scheduled' status
     console.log("\n💾 Step 2: Creating post in database...");
     const nextScheduledTime = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
     
@@ -53,26 +53,39 @@ async function testFullPipeline(campaignId: number) {
     console.log("\n🤖 Step 3: Running pipeline (AI Generation + Image Search)...");
     await processNewPost(post, campaign, undefined, nextScheduledTime);
     
+    // Fetch updated post to see results
     const updatedPost = await storage.getPost(post.id);
+    if (!updatedPost) throw new Error("Could not fetch updated post");
+
     console.log(`✅ Pipeline Complete!`);
-    console.log(`📝 Generated Caption: ${updatedPost?.generatedCaption?.substring(0, 100)}...`);
-    console.log(`🖼️ Final Image URL: ${updatedPost?.imageUrl}`);
-    console.log(`🏷️ Image Search Phrase: ${updatedPost?.imageSearchPhrase}`);
+    console.log(`📝 Generated Caption: ${updatedPost.generatedCaption?.substring(0, 100)}...`);
+    console.log(`🖼️ Final Image URL: ${updatedPost.imageUrl}`);
+    console.log(`🏷️ Image Search Phrase: ${updatedPost.imageSearchPhrase}`);
+
+    // 4. Publish to Postly (if requested)
+    if (shouldPublish) {
+      console.log("\n📤 Step 4: Publishing to Postly...");
+      await publishPost(updatedPost, campaign);
+      console.log(`✅ Published successfully!`);
+    } else {
+      console.log("\nℹ️ Skipping publish step. Run with --publish to post to Postly.");
+    }
 
   } catch (error) {
     console.error("❌ Pipeline Test Failed:", error);
   }
 }
 
-// Get campaign ID from command line arguments
+// Get campaign ID and flags from command line arguments
 const campaignId = parseInt(process.argv[2]);
+const shouldPublish = process.argv.includes("--publish");
 
 if (isNaN(campaignId)) {
-  console.log("Please provide a valid campaign ID: npx tsx server/test-pipeline.ts <campaign_id>");
+  console.log("Please provide a valid campaign ID: npx tsx server/test-pipeline.ts <campaign_id> [--publish]");
   process.exit(1);
 }
 
-testFullPipeline(campaignId).then(() => {
+testFullPipeline(campaignId, shouldPublish).then(() => {
   console.log("\n✨ Test finished.");
   process.exit(0);
 });

@@ -41,6 +41,7 @@ export interface IStorage {
   ): Promise<Post[]>;
 
   getPostByGuid(guid: string, campaignId?: number): Promise<Post | undefined>;
+  getPostByImageUrl(imageUrl: string): Promise<Post | undefined>;
   getPostBySourceMatch(
     campaignId: number,
     match: { guid?: string; url?: string; title?: string },
@@ -264,6 +265,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(posts)
       .where(eq(posts.sourceGuid, guid));
+    return post || undefined;
+  }
+
+  async getPostByImageUrl(imageUrl: string): Promise<Post | undefined> {
+    const [post] = await db
+      .select()
+      .from(posts)
+      .where(eq(posts.imageUrl, imageUrl));
     return post || undefined;
   }
 

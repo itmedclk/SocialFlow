@@ -1,7 +1,6 @@
 import { storage } from "../storage";
 import { generateCaption, validateContent, getSafetyConfigFromCampaign } from "./ai";
-import { searchImage, extractOgImage, getImageKeywordsFromCampaign } from "./images";
-import { generateAiImage } from "./ai-image";
+import { searchImage, getImageKeywordsFromCampaign } from "./images";
 import { publishToPostly } from "./postly";
 import { CronExpressionParser } from "cron-parser";
 import type { Post, Campaign } from "../../shared/schema";
@@ -77,74 +76,11 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
       throw new Error(`Caption failed safety validation after ${MAX_RETRIES} attempts: ${safetyResult.issues.join(", ")}`);
     }
 
-    let imageUrl = post.imageUrl;
+    let imageUrl: string | null = null;
     let imageCredit: string | null = null;
-    let aiImageAttempted = false;
 
-    // Check if campaign uses AI image generation
-    if (campaign.useAiImage && caption && settings?.novitaApiKey) {
-      aiImageAttempted = true;
-      // Use AI-generated image prompt from caption generation
-      try {
-        // Use the imagePrompt from AI caption generation, fallback to a simple prompt if not provided
-        const finalImagePrompt =
-          imagePrompt ||
-          `Bright, clean still-life or nature landscape inspired by ${campaign.topic || "wellness"}. Objects or scenery only: plants, food, tools, products, or natural elements. No people, no faces, no bodies, no hands, no silhouettes, no crowds. Natural lighting, warm colors, minimal background, no text, no logos.`;
-        const aiImageResult = await generateAiImage(
-          finalImagePrompt,
-          settings.aiImageModel || "flux-1-schnell",
-          settings.novitaApiKey,
-          campaign.id,
-        );
-        
-        if (aiImageResult) {
-          imageUrl = aiImageResult.url;
-          imageCredit = aiImageResult.credit;
-          
-          await storage.createLog({
-            campaignId: campaign.id,
-            postId: post.id,
-            userId: campaign.userId,
-            level: "info",
-            message: "AI image generated successfully",
-          });
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        await storage.createLog({
-          campaignId: campaign.id,
-          postId: post.id,
-          userId: campaign.userId,
-          level: "warning",
-          message: `AI image generation failed, falling back to stock images: ${errorMessage}`,
-        });
-        // Fall through to stock image search
-      }
-    } else if (campaign.useAiImage && !settings?.novitaApiKey) {
-      // AI image enabled but no API key configured - log and fall back to stock
-      await storage.createLog({
-        campaignId: campaign.id,
-        postId: post.id,
-        userId: campaign.userId,
-        level: "warning",
-        message: "AI image generation enabled but Novita API key not configured, falling back to stock images",
-      });
-    }
-
-    // If no AI image, try extracting OG image from source
-    if (!imageUrl) {
-      const ogImage = await extractOgImage(post.sourceUrl);
-      if (ogImage) {
-        const duplicateOg = await storage.getPostByImageUrlInCampaign(campaign.id, ogImage);
-        if (!duplicateOg || duplicateOg.id === post.id) {
-          imageUrl = ogImage;
-          imageCredit = "Source article";
-        }
-      }
-    }
-
-    // If still no image, search stock photos (always fall back regardless of AI image setting)
-    if (!imageUrl) {
+    // Always search stock photos first (never use source article images)
+    {
       // Use campaign image providers, or fall back to default providers
       const providers = campaign.imageProviders && campaign.imageProviders.length > 0
         ? campaign.imageProviders

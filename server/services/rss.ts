@@ -165,7 +165,7 @@ export async function processCampaignFeeds(
 
         if (isNew) {
           result.new++;
-          result.articles.push(article);
+          result.articles.push(parseArticle(article as Parser.Item));
         }
       }
     } catch (error) {

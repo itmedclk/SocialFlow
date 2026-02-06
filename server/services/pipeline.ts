@@ -4,7 +4,9 @@ import { searchImage, extractOgImage, getImageKeywordsFromCampaign } from "./ima
 import { generateAiImage } from "./ai-image";
 import { publishToPostly } from "./postly";
 import { CronExpressionParser } from "cron-parser";
-import type { Post, Campaign } from "@shared/schema";
+import type { Post, Campaign } from "../../shared/schema";
+import { db } from "../db";
+import { userSettings } from "../../shared/schema";
 import { appendPostToSheet } from "./google-sheets";
 import { formatInTimeZone, DEFAULT_TIMEZONE, resolveTimeZone } from "./time";
 
@@ -34,7 +36,16 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
     let imagePrompt: string = "";
     let safetyResult: { isValid: boolean; issues: string[] } = { isValid: false, issues: [] };
     
-    const settings = campaign.userId ? await storage.getUserSettings(campaign.userId) : undefined;
+    let targetUserId = campaign.userId;
+    if (!targetUserId) {
+      const allSettings = await db.select().from(userSettings).limit(1);
+      if (allSettings.length > 0) {
+        targetUserId = allSettings[0].userId;
+        console.log(`[Pipeline] No userId on campaign, using first found user: "${targetUserId}"`);
+      }
+    }
+    const settings = targetUserId ? await storage.getUserSettings(targetUserId) : undefined;
+    console.log(`[Pipeline] User settings loaded: pexelsApiKey=${!!settings?.pexelsApiKey}, unsplashAccessKey=${!!settings?.unsplashAccessKey}`);
     const modelName = settings?.aiModel || process.env.AI_MODEL || "deepseek/deepseek-v3.2";
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -187,7 +198,7 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
       status: newStatus,
       scheduledFor,
       aiModel: modelName,
-    }, campaign.userId);
+    }, campaign.userId ?? undefined);
 
     if (scheduledFor) {
       await storage.createLog({
@@ -206,7 +217,7 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
       status: "failed",
       failureReason: errorMessage,
       retryCount: (post.retryCount || 0) + 1,
-    }, campaign.userId);
+    }, campaign.userId ?? undefined);
 
     await storage.createLog({
       campaignId: campaign.id,
@@ -242,7 +253,7 @@ export async function publishPost(post: Post, campaign: Campaign, captionOverrid
       await storage.updatePost(post.id, {
         status: "posted",
         postedAt: new Date(),
-      }, campaign.userId);
+      }, campaign.userId ?? undefined);
 
       await storage.createLog({
         campaignId: campaign.id,
@@ -294,7 +305,7 @@ export async function publishPost(post: Post, campaign: Campaign, captionOverrid
     status: "failed",
     failureReason: lastError || "Max retries exceeded",
     retryCount: attempts,
-  }, campaign.userId);
+  }, campaign.userId ?? undefined);
 
   await storage.createLog({
     campaignId: campaign.id,
@@ -317,7 +328,7 @@ export async function processDraftPosts(campaignId: number, userId?: string): Pr
     throw new Error(`Campaign ${campaignId} not found`);
   }
 
-  const drafts = await storage.getPostsByCampaign(campaignId, 50, campaign.userId);
+  const drafts = await storage.getPostsByCampaign(campaignId, 50, campaign.userId ?? undefined);
   const unprocessedDrafts = drafts.filter(
     (p) => p.status === "draft" && !p.generatedCaption
   );
@@ -350,7 +361,7 @@ export async function publishScheduledPosts(): Promise<{
   const publishedPostIds = new Set<number>();
 
   for (const campaign of allCampaigns) {
-    const posts = await storage.getPostsByCampaign(campaign.id, 50, campaign.userId);
+    const posts = await storage.getPostsByCampaign(campaign.id, 50, campaign.userId ?? undefined);
     const scheduledPosts = posts.filter(
       (p) =>
         p.status === "scheduled" &&
@@ -403,7 +414,7 @@ export async function processNextPosts(
     // Skip auto-publish campaigns - they're handled by checkAndScheduleNextPost
     if (campaign.autoPublish) continue;
 
-    const posts = await storage.getPostsByCampaign(campaign.id, 50, campaign.userId);
+    const posts = await storage.getPostsByCampaign(campaign.id, 50, campaign.userId ?? undefined);
     
     const postsNeedingPrep = posts.filter((p) => {
       if (p.status !== "approved" && p.status !== "scheduled") return false;

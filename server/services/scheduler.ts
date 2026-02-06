@@ -5,6 +5,7 @@ import {
   publishScheduledPosts,
   processNextPosts,
   processNewPost,
+  RelevanceError,
 } from "./pipeline";
 import type { Campaign } from "../../shared/schema";
 import { CronExpressionParser } from "cron-parser";
@@ -277,31 +278,41 @@ async function checkAndScheduleNextPost(campaign: Campaign): Promise<boolean> {
       if (rssResult.new > 0 && rssResult.articles && rssResult.articles.length > 0) {
         console.log(`[Scheduler] Found ${rssResult.new} new articles from RSS`);
         
-        const newestArticle = rssResult.articles[0];
-        
-        // Create the post directly with scheduled status instead of draft
-        const postData = {
-          campaignId: campaign.id,
-          userId: campaign.userId,
-          sourceTitle: newestArticle.title,
-          sourceUrl: newestArticle.link,
-          sourceGuid: newestArticle.guid,
-          sourceSnippet: newestArticle.snippet,
-          pubDate: newestArticle.pubDate,
-          imageUrl: newestArticle.imageUrl,
-          status: "scheduled",
-          scheduledFor: nextScheduledTime,
-        };
+        // Try each article until one passes relevance check and processing
+        for (const article of rssResult.articles) {
+          const postData = {
+            campaignId: campaign.id,
+            userId: campaign.userId,
+            sourceTitle: article.title,
+            sourceUrl: article.link,
+            sourceGuid: article.guid,
+            sourceSnippet: article.snippet,
+            pubDate: article.pubDate,
+            imageUrl: article.imageUrl,
+            status: "scheduled",
+            scheduledFor: nextScheduledTime,
+          };
 
-        const post = await storage.createPost(postData as any);
-        
-        console.log(
-          `[Scheduler] Processing new article ${post.id} for ${formatInTimeZone(nextScheduledTime, campaign.scheduleTimezone)}...`,
-        );
-        
-        await processNewPost(post, campaign, undefined, nextScheduledTime);
-        console.log(`[Scheduler] Processed and scheduled new post ${post.id}`);
-        return true;
+          const post = await storage.createPost(postData as any);
+          
+          console.log(
+            `[Scheduler] Processing article "${article.title}" (post ${post.id}) for ${formatInTimeZone(nextScheduledTime, campaign.scheduleTimezone)}...`,
+          );
+          
+          try {
+            await processNewPost(post, campaign, undefined, nextScheduledTime);
+            console.log(`[Scheduler] Processed and scheduled post ${post.id}`);
+            return true;
+          } catch (error) {
+            if (error instanceof RelevanceError) {
+              console.log(`[Scheduler] Article not relevant, trying next article...`);
+              continue;
+            }
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            console.error(`[Scheduler] Processing failed for post ${post.id}: ${errorMsg}`);
+            break;
+          }
+        }
       }
     } catch (error) {
       console.error(`[Scheduler] RSS fetch error for campaign ${campaign.id}:`, error);

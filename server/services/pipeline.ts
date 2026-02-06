@@ -1,5 +1,5 @@
 import { storage } from "../storage";
-import { generateCaption, validateContent, getSafetyConfigFromCampaign } from "./ai";
+import { generateCaption, validateContent, getSafetyConfigFromCampaign, checkArticleRelevance } from "./ai";
 import { searchImage, getImageKeywordsFromCampaign } from "./images";
 import { publishToPostly } from "./postly";
 import { CronExpressionParser } from "cron-parser";
@@ -10,6 +10,13 @@ import { appendPostToSheet } from "./google-sheets";
 import { formatInTimeZone, DEFAULT_TIMEZONE, resolveTimeZone } from "./time";
 
 const MAX_RETRIES = 3;
+
+export class RelevanceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RelevanceError";
+  }
+}
 const formatCampaignTime = (date: Date, campaign: Campaign) =>
   formatInTimeZone(date, resolveTimeZone(campaign.scheduleTimezone));
 
@@ -47,6 +54,40 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
     const settings = targetUserId ? await storage.getUserSettings(targetUserId) : undefined;
     console.log(`[Pipeline] User settings loaded: pexelsApiKey=${!!settings?.pexelsApiKey}, unsplashAccessKey=${!!settings?.unsplashAccessKey}`);
     const modelName = settings?.aiModel || process.env.AI_MODEL || "deepseek/deepseek-v3.2";
+
+    // Pre-check: Is this article relevant to the campaign topic for educational content?
+    console.log(`[Pipeline] Checking article relevance for campaign "${campaign.name}" (topic: ${campaign.topic})...`);
+    const relevanceResult = await checkArticleRelevance(post, campaign);
+    
+    if (!relevanceResult.isRelevant) {
+      const failReason = `Article not relevant for educational content: ${relevanceResult.reason}`;
+      console.log(`[Pipeline] Article rejected: ${failReason}`);
+      
+      await storage.updatePost(post.id, {
+        status: "failed",
+        failureReason: failReason,
+      }, campaign.userId ?? undefined);
+
+      await storage.createLog({
+        campaignId: campaign.id,
+        postId: post.id,
+        userId: campaign.userId,
+        level: "warning",
+        message: `Article failed relevance check: ${relevanceResult.reason}`,
+        metadata: { title: post.sourceTitle, topic: campaign.topic },
+      });
+
+      throw new RelevanceError(failReason);
+    }
+
+    console.log(`[Pipeline] Article passed relevance check: ${relevanceResult.reason}`);
+    await storage.createLog({
+      campaignId: campaign.id,
+      postId: post.id,
+      userId: campaign.userId,
+      level: "info",
+      message: `Article passed relevance check: ${relevanceResult.reason}`,
+    });
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       const result = await generateCaption(post, campaign, overridePrompt);
@@ -173,6 +214,12 @@ export async function processNewPost(post: Post, campaign: Campaign, overridePro
     }
 
   } catch (error) {
+    // RelevanceError is already handled above (post marked failed, log created)
+    // Just re-throw without double-logging
+    if (error instanceof RelevanceError) {
+      throw error;
+    }
+
     const errorMessage = error instanceof Error ? error.message : String(error);
     
     await storage.updatePost(post.id, {

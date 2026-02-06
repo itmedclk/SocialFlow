@@ -93,6 +93,75 @@ async function fetchFullContent(url: string): Promise<string | null> {
   }
 }
 
+export interface RelevanceCheckResult {
+  isRelevant: boolean;
+  reason: string;
+}
+
+export async function checkArticleRelevance(
+  post: Post,
+  campaign: Campaign,
+): Promise<RelevanceCheckResult> {
+  const config = await getAIConfig(campaign.userId);
+
+  const prompt = `You are a content relevance evaluator. Your job is to determine if an article is suitable for creating an educational social media post about the topic: "${campaign.topic}".
+
+Article Title: ${post.sourceTitle}
+Article Snippet: ${post.sourceSnippet || "N/A"}
+Article URL: ${post.sourceUrl}
+
+Evaluate whether this article is:
+1. Related to the campaign topic "${campaign.topic}"
+2. Suitable for educational or informational social media content
+3. Not purely promotional, clickbait, or irrelevant
+
+Respond with ONLY valid JSON (no markdown, no code blocks):
+{"isRelevant": true/false, "reason": "brief explanation"}`;
+
+  try {
+    const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [
+          { role: "system", content: "You are a content relevance evaluator. Always respond with valid JSON only." },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 200,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`[AI] Relevance check API error: ${response.status}`);
+      return { isRelevant: true, reason: "Relevance check skipped due to API error" };
+    }
+
+    const data: ChatCompletionResponse = await response.json();
+    const content = data.choices?.[0]?.message?.content?.trim();
+
+    if (!content) {
+      return { isRelevant: true, reason: "Relevance check skipped: empty AI response" };
+    }
+
+    const cleaned = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+
+    return {
+      isRelevant: !!parsed.isRelevant,
+      reason: parsed.reason || "No reason provided",
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[AI] Relevance check failed: ${errorMessage}`);
+    return { isRelevant: true, reason: `Relevance check skipped due to error: ${errorMessage}` };
+  }
+}
+
 export interface CaptionResult {
   caption: string;
   imageSearchPhrase: string;

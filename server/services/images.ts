@@ -171,13 +171,17 @@ async function searchPexels(
   const page = offset + 1;
   const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}&orientation=landscape&size=large`;
 
+  console.log(`[Pexels] Requesting: ${url}`);
   const response = await fetch(url, {
     headers: {
       "Authorization": apiKey.trim(),
+      "Accept": "application/json"
     },
   });
 
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`[Pexels] API Error ${response.status}: ${errorText}`);
     throw new Error(`Pexels API error: ${response.status}`);
   }
 
